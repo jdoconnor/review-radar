@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { clearCache, pruneCache } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
@@ -23,6 +24,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [seenVersion, setSeenVersion] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const wide = useMediaQuery("(min-width: 68.75em)");
   const sessionViewer = (() => {
     try {
       return sessionStorage.getItem("github-ui.viewer");
@@ -114,6 +116,44 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     void resetLocalData().finally(onSignOut);
   };
 
+  const reviewList = (
+    <PullRequestList
+      kind="review"
+      heading={wide ? "Needs my review" : undefined}
+      active={wide ? tab === "review" : true}
+      items={reviewItems}
+      loading={reviewQuery.loading}
+      refreshing={reviewQuery.refreshing}
+      error={reviewQuery.error}
+      warning={reviewQuery.warning}
+      stale={reviewQuery.stale}
+      fromCache={reviewQuery.fromCache}
+      lastUpdated={reviewQuery.lastUpdated}
+      onActivate={() => setTab("review")}
+      onMarkSeen={onMarkSeen}
+      onRefresh={reviewQuery.refresh}
+    />
+  );
+
+  const mineList = (
+    <PullRequestList
+      kind="mine"
+      heading={wide ? "My pull requests" : undefined}
+      active={wide ? tab === "mine" : true}
+      items={mineItems}
+      loading={mineQuery.loading}
+      refreshing={mineQuery.refreshing}
+      error={mineQuery.error}
+      warning={mineQuery.warning}
+      stale={mineQuery.stale}
+      fromCache={mineQuery.fromCache}
+      lastUpdated={mineQuery.lastUpdated}
+      onActivate={() => setTab("mine")}
+      onMarkSeen={onMarkSeen}
+      onRefresh={mineQuery.refresh}
+    />
+  );
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -127,28 +167,30 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
           </div>
         </div>
 
-        <nav className="tabs" aria-label="Views">
-          <button
-            type="button"
-            className={`tab ${tab === "review" ? "active" : ""}`}
-            aria-current={tab === "review" ? "page" : undefined}
-            onClick={() => setTab("review")}
-            data-testid="tab-review"
-          >
-            Needs my review
-            {reviewItems.length > 0 ? <span className="count">{reviewItems.length}</span> : null}
-          </button>
-          <button
-            type="button"
-            className={`tab ${tab === "mine" ? "active" : ""}`}
-            aria-current={tab === "mine" ? "page" : undefined}
-            onClick={() => setTab("mine")}
-            data-testid="tab-mine"
-          >
-            My pull requests
-            {mineItems.length > 0 ? <span className="count">{mineItems.length}</span> : null}
-          </button>
-        </nav>
+        {!wide ? (
+          <nav className="tabs" aria-label="Views">
+            <button
+              type="button"
+              className={`tab ${tab === "review" ? "active" : ""}`}
+              aria-current={tab === "review" ? "page" : undefined}
+              onClick={() => setTab("review")}
+              data-testid="tab-review"
+            >
+              Needs my review
+              {reviewItems.length > 0 ? <span className="count">{reviewItems.length}</span> : null}
+            </button>
+            <button
+              type="button"
+              className={`tab ${tab === "mine" ? "active" : ""}`}
+              aria-current={tab === "mine" ? "page" : undefined}
+              onClick={() => setTab("mine")}
+              data-testid="tab-mine"
+            >
+              My pull requests
+              {mineItems.length > 0 ? <span className="count">{mineItems.length}</span> : null}
+            </button>
+          </nav>
+        ) : null}
 
         <div className="topbar-actions">
           {!online ? (
@@ -187,34 +229,15 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       </header>
 
       <main className="content">
-        {tab === "review" ? (
-          <PullRequestList
-            kind="review"
-            items={reviewItems}
-            loading={reviewQuery.loading}
-            refreshing={reviewQuery.refreshing}
-            error={reviewQuery.error}
-            warning={reviewQuery.warning}
-            stale={reviewQuery.stale}
-            fromCache={reviewQuery.fromCache}
-            lastUpdated={reviewQuery.lastUpdated}
-            onMarkSeen={onMarkSeen}
-            onRefresh={reviewQuery.refresh}
-          />
+        {wide ? (
+          <div className="workspace">
+            {reviewList}
+            {mineList}
+          </div>
+        ) : tab === "review" ? (
+          reviewList
         ) : (
-          <PullRequestList
-            kind="mine"
-            items={mineItems}
-            loading={mineQuery.loading}
-            refreshing={mineQuery.refreshing}
-            error={mineQuery.error}
-            warning={mineQuery.warning}
-            stale={mineQuery.stale}
-            fromCache={mineQuery.fromCache}
-            lastUpdated={mineQuery.lastUpdated}
-            onMarkSeen={onMarkSeen}
-            onRefresh={mineQuery.refresh}
-          />
+          mineList
         )}
       </main>
 
