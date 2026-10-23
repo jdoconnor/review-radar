@@ -18,6 +18,7 @@ function searchResponse(nodes: unknown[]): Response {
   return jsonResponse({
     data: {
       search: { nodes },
+      viewer: { login: "jdoconnor" },
       rateLimit: { limit: 5000, remaining: 4999, resetAt: "2026-10-22T13:00:00Z", cost: 1 },
     },
   });
@@ -25,6 +26,7 @@ function searchResponse(nodes: unknown[]): Response {
 
 beforeEach(async () => {
   await clearCache();
+  sessionStorage.clear();
   localStorage.setItem("github-ui.token", "test-token");
 });
 
@@ -59,6 +61,60 @@ describe("App", () => {
     await userEvent.click(screen.getByTestId("tab-mine"));
     expect(await screen.findByText("My open pull request")).toBeInTheDocument();
     expect(screen.getByTestId("approval-pill")).toHaveTextContent("1 approval");
+  });
+
+  it("shows whether the viewer or someone else approved a pull request", async () => {
+    const approvedByViewer = makePr({
+      id: "self-approved",
+      number: 44,
+      title: "Already approved by you",
+      reviews: {
+        nodes: [
+          {
+            id: "R_self",
+            state: "APPROVED",
+            submittedAt: "2026-10-20T11:30:00.000Z",
+            author: { login: "jdoconnor" },
+          },
+        ],
+      },
+    });
+    const approvedByOther = makePr({
+      id: "other-approved",
+      number: 45,
+      title: "Approved by someone else",
+      reviews: {
+        nodes: [
+          {
+            id: "R_other",
+            state: "APPROVED",
+            submittedAt: "2026-10-20T11:30:00.000Z",
+            author: { login: "alice" },
+          },
+        ],
+      },
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { variables?: { search?: string } };
+        const search = String(body.variables?.search ?? "");
+        return search.includes("review-requested")
+          ? searchResponse([approvedByViewer])
+          : searchResponse([approvedByOther]);
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("Already approved by you")).toBeInTheDocument();
+    expect(screen.getByTestId("approval-pill")).toHaveTextContent("You approved");
+    expect(screen.getByTestId("approval-pill")).toHaveTextContent("1 approval");
+
+    await userEvent.click(screen.getByTestId("tab-mine"));
+    expect(await screen.findByText("Approved by someone else")).toBeInTheDocument();
+    expect(screen.getByTestId("approval-pill")).toHaveTextContent("1 approval by others");
   });
 
   it("shows new activity since the last visit and clears it when marked seen", async () => {
@@ -112,6 +168,7 @@ describe("App", () => {
         jsonResponse({
           data: {
             search: { nodes: [pr] },
+            viewer: { login: "jdoconnor" },
             rateLimit: { limit: 5000, remaining: 4999, resetAt: "2026-10-22T13:00:00Z", cost: 1 },
           },
           errors: [

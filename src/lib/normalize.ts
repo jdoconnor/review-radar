@@ -58,10 +58,13 @@ export function summarizeChecks(pr: PullRequestNode): CheckSummary {
   return { state, total, failing, pending };
 }
 
-/** Latest review per human author. Superseded reviews no longer count. */
+/** Latest decisive review per human author. A later comment does not revoke an approval or change request. */
 export function latestReviews(reviews: ReviewNode[]): ReviewNode[] {
   const byAuthor = new Map<string, ReviewNode>();
   for (const review of reviews) {
+    if (review.state !== "APPROVED" && review.state !== "CHANGES_REQUESTED" && review.state !== "DISMISSED") {
+      continue;
+    }
     const login = review.author?.login;
     if (!login) continue;
     const existing = byAuthor.get(login);
@@ -106,10 +109,19 @@ function activityAfter(pr: PullRequestNode, lastSeenAt: number | null): number {
 
 export function toSummary(
   pr: PullRequestNode,
-  options: { lastSeenAt: number | null; reviewRequestedFromMe: boolean },
+  options: { lastSeenAt: number | null; reviewRequestedFromMe: boolean; viewerLogin?: string | null },
 ): PullRequestSummary {
   const key = `${pr.repository.nameWithOwner}#${pr.number}`;
   const reviews = pr.reviews?.nodes ?? [];
+  const latest = latestReviews(reviews);
+  const approvals = latest.filter((review) => review.state === "APPROVED");
+  const viewerLogin = options.viewerLogin ?? null;
+  const approvedByViewer = viewerLogin
+    ? approvals.some((review) => review.author?.login === viewerLogin)
+    : false;
+  const approvalsByOthers = viewerLogin
+    ? approvals.filter((review) => review.author?.login !== viewerLogin).length
+    : approvals.length;
   return {
     key,
     id: pr.id,
@@ -131,8 +143,11 @@ export function toSummary(
     reviewRequestedFromMe: options.reviewRequestedFromMe,
     pendingReviewRequests: pr.reviewRequests?.totalCount ?? 0,
     teamReviewRequests: teamReviewRequests(pr),
-    approvals: approvalCount(reviews),
-    changesRequested: changesRequestedCount(reviews),
+    approvals: approvals.length,
+    approvedByViewer,
+    approvalsByOthers,
+    viewerKnown: Boolean(viewerLogin),
+    changesRequested: latest.filter((review) => review.state === "CHANGES_REQUESTED").length,
     comments: pr.comments?.totalCount ?? 0,
     newActivity: activityAfter(pr, options.lastSeenAt),
     lastSeenAt: options.lastSeenAt,

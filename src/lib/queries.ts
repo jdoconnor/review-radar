@@ -65,6 +65,7 @@ function searchQuery(): string {
           }
         }
       }
+      viewer { login }
       ${RATE_LIMIT}
     }
   `;

@@ -23,7 +23,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [seenVersion, setSeenVersion] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
-  const viewer = (() => {
+  const sessionViewer = (() => {
     try {
       return sessionStorage.getItem("github-ui.viewer");
     } catch {
@@ -58,22 +58,29 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     refreshSeconds: settings.refreshSeconds,
   });
 
+  const viewerLogin =
+    reviewQuery.data?.viewer?.login ?? mineQuery.data?.viewer?.login ?? sessionViewer;
+
   const reviewItems = useMemo(() => {
     void seenVersion;
     if (!reviewQuery.data) return [];
     return pullRequests(reviewQuery.data).map((pr) =>
-      toSummary(pr, { lastSeenAt: null, reviewRequestedFromMe: true }),
+      toSummary(pr, { lastSeenAt: null, reviewRequestedFromMe: true, viewerLogin }),
     );
-  }, [reviewQuery.data, seenVersion]);
+  }, [reviewQuery.data, seenVersion, viewerLogin]);
 
   const mineItems = useMemo(() => {
     void seenVersion;
     if (!mineQuery.data) return [];
     return pullRequests(mineQuery.data).map((pr) => {
       const key = `${pr.repository.nameWithOwner}#${pr.number}`;
-      return toSummary(pr, { lastSeenAt: lastSeenFor(key), reviewRequestedFromMe: false });
+      return toSummary(pr, {
+        lastSeenAt: lastSeenFor(key),
+        reviewRequestedFromMe: false,
+        viewerLogin,
+      });
     });
-  }, [mineQuery.data, seenVersion]);
+  }, [mineQuery.data, seenVersion, viewerLogin]);
 
   const onMarkSeen = useCallback((key: string) => {
     markSeen(key);
@@ -116,7 +123,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
           </span>
           <div>
             <strong>Review Radar</strong>
-            <span className="brand-sub">{viewer ? `@${viewer}` : "github-ui"}</span>
+            <span className="brand-sub">{viewerLogin ? `@${viewerLogin}` : "github-ui"}</span>
           </div>
         </div>
 
