@@ -21,7 +21,13 @@ export interface GraphQLPayload<T> {
   data: T;
   rateLimit: RateLimit | null;
   warning?: string | null;
+  warningVersion?: number;
 }
+
+// Bump when the wording or derivation of `warning` changes. Cached payloads
+// from an older version still render, but skip the conditional request so the
+// next successful fetch replaces the stale warning text.
+const WARNING_VERSION = 2;
 
 export interface GraphQLResult<T> {
   data: T;
@@ -68,7 +74,28 @@ function rateLimitFromHeaders(headers: Headers): RateLimit | null {
 interface GraphQLErrorShape {
   message?: string;
   type?: string;
+  path?: Array<string | number>;
 }
+
+type PermissionKey = "contents" | "checks" | "statuses" | "pullRequests" | "issues" | "members";
+
+const PERMISSION_ORDER: PermissionKey[] = [
+  "contents",
+  "checks",
+  "statuses",
+  "pullRequests",
+  "issues",
+  "members",
+];
+
+const PERMISSION_INFO: Record<PermissionKey, { label: string; scope: "repository" | "organization" }> = {
+  contents: { label: "Contents (read-only)", scope: "repository" },
+  checks: { label: "Checks (read-only)", scope: "repository" },
+  statuses: { label: "Commit statuses (read-only)", scope: "repository" },
+  pullRequests: { label: "Pull requests (read-only)", scope: "repository" },
+  issues: { label: "Issues (read-only)", scope: "repository" },
+  members: { label: "Members (read-only, organization)", scope: "organization" },
+};
 
 function uniqueMessages(errors: GraphQLErrorShape[]): string {
   return Array.from(
@@ -94,8 +121,76 @@ function isRateLimitError(error: GraphQLErrorShape): boolean {
   return /rate limit/i.test(String(error.message ?? ""));
 }
 
-const FORBIDDEN_HINT =
-  "Check the token's repository access and permissions; the CI rollup needs Contents, Checks and Commit statuses read access.";
+function formatList(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0] ?? "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
+function permissionsFor(errors: GraphQLErrorShape[]): PermissionKey[] {
+  const found = new Set<PermissionKey>();
+  for (const error of errors) {
+    const path = error.path ?? [];
+    if (path.includes("contexts")) {
+      found.add("checks");
+      found.add("statuses");
+    } else if (path.includes("commits") || path.includes("statusCheckRollup")) {
+      found.add("contents");
+    } else if (path.includes("requestedReviewer")) {
+      found.add("members");
+    } else if (path.includes("labels") || path.includes("comments")) {
+      found.add("issues");
+    } else if (
+      path.includes("reviewRequests") ||
+      path.includes("reviews") ||
+      path.includes("reviewDecision") ||
+      path.includes("mergeable")
+    ) {
+      found.add("pullRequests");
+    }
+  }
+  return PERMISSION_ORDER.filter((key) => found.has(key));
+}
+
+function permissionInstructions(permissions: PermissionKey[]): string {
+  const labels = permissions.map((key) => PERMISSION_INFO[key]);
+  const repository = labels.filter((permission) => permission.scope === "repository").map((permission) => permission.label);
+  const organization = labels.filter((permission) => permission.scope === "organization").map((permission) => permission.label);
+  const instructions: string[] = [];
+
+  if (repository.length > 0) {
+    instructions.push(
+      `Add ${repository.length === 1 ? "this repository permission" : "these repository permissions"} to the fine-grained token: ${formatList(repository)}.`,
+    );
+  }
+  if (organization.length > 0) {
+    instructions.push(
+      `Add ${organization.length === 1 ? "this organization permission" : "these organization permissions"} to the fine-grained token: ${formatList(organization)}.`,
+    );
+  }
+
+  return instructions.join(" ");
+}
+
+const FALLBACK_HINT =
+  "Check the token's repository access; the CI rollup needs Contents, Checks and Commit statuses (all read-only).";
+
+function permissionHint(errors: GraphQLErrorShape[]): string {
+  const permissions = permissionsFor(errors);
+  if (permissions.length === 0) {
+    return FALLBACK_HINT;
+  }
+  return `${permissionInstructions(permissions)} Then refresh.`;
+}
+
+function partialDataWarning(errors: GraphQLErrorShape[]): string {
+  const permissions = permissionsFor(errors);
+  const ciOnly =
+    permissions.length === 0 ||
+    permissions.every((key) => key === "contents" || key === "checks" || key === "statuses");
+  return `${ciOnly ? "Some CI data could not be loaded." : "Some data could not be loaded."} ${permissionHint(errors)}`;
+}
 
 function messageFromBody(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object") return fallback;
@@ -106,6 +201,20 @@ function messageFromBody(body: unknown, fallback: string): string {
     if (messages) return messages;
   }
   return fallback;
+}
+
+function errorsFromBody(body: unknown): GraphQLErrorShape[] {
+  if (!body || typeof body !== "object") return [];
+  const errors = (body as { errors?: unknown }).errors;
+  return Array.isArray(errors) ? (errors as GraphQLErrorShape[]) : [];
+}
+
+function cachedWarning<T>(cached: { value: GraphQLPayload<T> } | null): string | null {
+  if (!cached?.value.warning) return null;
+  if (cached.value.warningVersion !== WARNING_VERSION) {
+    return `Some CI data could not be loaded. ${FALLBACK_HINT}`;
+  }
+  return cached.value.warning;
 }
 
 /**
@@ -120,13 +229,15 @@ export async function fetchGraphQL<T>(
 ): Promise<GraphQLResult<T>> {
   const key = cacheKey(query, variables);
   const cached = await readCache<GraphQLPayload<T>>(key);
+  const warningOutdated =
+    Boolean(cached?.value.warning) && cached?.value.warningVersion !== WARNING_VERSION;
 
   const headers: Record<string, string> = {
     Authorization: `bearer ${token}`,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (cached?.etag && !options.force) headers["If-None-Match"] = cached.etag;
+  if (cached?.etag && !options.force && !warningOutdated) headers["If-None-Match"] = cached.etag;
 
   let response: Response;
   try {
@@ -142,7 +253,7 @@ export async function fetchGraphQL<T>(
       return {
         data: cached.value.data,
         rateLimit: cached.value.rateLimit,
-        warning: cached.value.warning ?? null,
+        warning: cachedWarning(cached),
         fromCache: true,
         stale: true,
         fetchedAt: cached.fetchedAt,
@@ -156,7 +267,7 @@ export async function fetchGraphQL<T>(
     return {
       data: cached.value.data,
       rateLimit: cached.value.rateLimit,
-      warning: cached.value.warning ?? null,
+      warning: cachedWarning(cached),
       fromCache: true,
       stale: false,
       fetchedAt: cached.fetchedAt,
@@ -187,7 +298,9 @@ export async function fetchGraphQL<T>(
     if (response.status === 429 || exhausted) {
       throw new GithubError("rate-limit", message, response.status, rateLimit?.resetAt ?? null);
     }
-    throw new GithubError("forbidden", `${message} ${FORBIDDEN_HINT}`, response.status);
+    const bodyErrors = errorsFromBody(body);
+    const hint = permissionHint(bodyErrors);
+    throw new GithubError("forbidden", `${message} ${hint}`, response.status);
   }
   if (!response.ok) {
     throw new GithubError("http", messageFromBody(body, `GitHub returned ${response.status}.`), response.status);
@@ -212,10 +325,14 @@ export async function fetchGraphQL<T>(
   if (nonForbidden.length > 0) {
     throw new GithubError("graphql", uniqueMessages(nonForbidden), response.status);
   }
-  const warning =
-    errors.length > 0 ? `Some CI data could not be loaded. ${FORBIDDEN_HINT}` : null;
+  const warning = errors.length > 0 ? partialDataWarning(errors) : null;
 
-  const payload: GraphQLPayload<T> = { data: parsed.data, rateLimit, warning };
+  const payload: GraphQLPayload<T> = {
+    data: parsed.data,
+    rateLimit,
+    warning,
+    warningVersion: WARNING_VERSION,
+  };
   const etag = response.headers.get("etag");
   const fetchedAt = Date.now();
   await writeCache({ key, value: payload, etag, fetchedAt, lastUsedAt: fetchedAt });
