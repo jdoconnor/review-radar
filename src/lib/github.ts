@@ -1,7 +1,7 @@
 import { cacheKey, readCache, writeCache } from "./cache";
 import type { RateLimit } from "./types";
 
-export type GithubErrorKind = "auth" | "forbidden" | "rate-limit" | "network" | "graphql" | "http";
+export type GithubErrorKind = "auth" | "forbidden" | "rate-limit" | "network" | "graphql" | "http" | "url";
 
 export class GithubError extends Error {
   readonly kind: GithubErrorKind;
@@ -14,6 +14,18 @@ export class GithubError extends Error {
     this.kind = kind;
     this.status = status;
     this.resetAt = resetAt;
+  }
+}
+
+/**
+ * Thrown before `fetch` when the configured API base is not the exact endpoint
+ * the token is allowed to reach. A misconfiguration must never turn into a
+ * request that carries the token somewhere unexpected.
+ */
+export class GithubUrlError extends GithubError {
+  constructor(message: string) {
+    super("url", message);
+    this.name = "GithubUrlError";
   }
 }
 
@@ -42,9 +54,53 @@ export interface GraphQLResult<T> {
 export interface FetchOptions {
   signal?: AbortSignal;
   force?: boolean;
+  /** GitHub API base. github.com by default; a GitHub Enterprise `/api` base otherwise. */
+  apiBase?: string;
 }
 
+export const GITHUB_API_BASE = "https://api.github.com";
 export const GITHUB_GRAPHQL_URL = "https://api.github.com/graphql";
+
+function parseApiBase(apiBase: string): URL {
+  let url: URL;
+  try {
+    url = new URL(apiBase);
+  } catch {
+    throw new GithubUrlError("The GitHub API base is not a valid URL.");
+  }
+  if (url.protocol !== "https:") {
+    throw new GithubUrlError("The GitHub API base must use HTTPS.");
+  }
+  if (url.username || url.password) {
+    throw new GithubUrlError("The GitHub API base must not contain credentials.");
+  }
+  if (url.search || url.hash) {
+    throw new GithubUrlError("The GitHub API base must not contain a query string or fragment.");
+  }
+  return url;
+}
+
+/**
+ * The single place that decides which URL may receive the token. Returns
+ * `https://api.github.com/graphql` for github.com and derives
+ * `https://<host>/api/graphql` for a GitHub Enterprise API base.
+ */
+export function resolveGraphqlUrl(apiBase: string = GITHUB_API_BASE): string {
+  const base = parseApiBase(apiBase.trim() === "" ? GITHUB_API_BASE : apiBase.trim());
+  const path = base.pathname.replace(/\/+$/, "");
+
+  if (base.hostname === "api.github.com") {
+    if (path !== "") {
+      throw new GithubUrlError(`github.com's API base is ${GITHUB_API_BASE}; do not add a path.`);
+    }
+    return GITHUB_GRAPHQL_URL;
+  }
+
+  if (path !== "" && path !== "/api") {
+    throw new GithubUrlError("A GitHub Enterprise API base must look like https://ghe.example.com/api.");
+  }
+  return `${base.origin}/api/graphql`;
+}
 
 function parseRateLimit(value: unknown): RateLimit | null {
   if (!value || typeof value !== "object") return null;
@@ -227,6 +283,10 @@ export async function fetchGraphQL<T>(
   variables: Record<string, unknown>,
   options: FetchOptions = {},
 ): Promise<GraphQLResult<T>> {
+  // Resolve the endpoint before touching the cache or the network: an unsafe
+  // or malformed base must fail loudly and never send the token anywhere.
+  const endpoint = resolveGraphqlUrl(options.apiBase);
+
   const key = cacheKey(query, variables);
   const cached = await readCache<GraphQLPayload<T>>(key);
   const warningOutdated =
@@ -241,11 +301,13 @@ export async function fetchGraphQL<T>(
 
   let response: Response;
   try {
-    response = await fetch(GITHUB_GRAPHQL_URL, {
+    response = await fetch(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify({ query, variables }),
       signal: options.signal,
+      credentials: "omit",
+      referrerPolicy: "no-referrer",
     });
   } catch (error) {
     if (options.signal?.aborted) throw error;
