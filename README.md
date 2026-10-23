@@ -3,10 +3,11 @@
 A cache-first GitHub review dashboard. Two questions, one screen:
 
 - **Needs my review** — open pull requests with an outstanding review request
-  from me, oldest first, with CI, draft, team and conflict state.
-- **My pull requests** — open PRs I authored, with approval count, changes
-  requested, CI state, merge conflicts, and comments/reviews since I last marked
-  the PR seen.
+  from me, oldest first, with whether you or someone else approved, CI, draft,
+  team and conflict state.
+- **My pull requests** — open PRs I authored, with whether you or someone else
+  approved, changes requested, CI state, merge conflicts, and comments/reviews
+  since I last marked the PR seen.
 
 It is a static React app. It talks directly to the GitHub GraphQL API with a
 token you paste in; there is no backend, no proxy and no analytics. Responses are

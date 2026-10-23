@@ -42,23 +42,42 @@ export function CheckPill({ state, failing, total }: { state: CheckState; failin
 }
 
 export function ApprovalPill({ pr }: { pr: PullRequestSummary }) {
-  if (pr.reviewDecision === "APPROVED") {
+  if (pr.approvedByViewer) {
+    const others = pr.approvalsByOthers;
+    const label =
+      others > 0
+        ? `✓ You approved (${pr.approvals} approvals, ${others} other${others === 1 ? "" : "s"})`
+        : `✓ You approved (${pr.approvals} approval${pr.approvals === 1 ? "" : "s"})`;
     return (
-      <span className="pill approval" data-testid="approval-pill">
-        ✓ {pr.approvals} approval{pr.approvals === 1 ? "" : "s"}
+      <span className="pill approval" data-testid="approval-pill" data-approval="viewer">
+        {label}
       </span>
     );
   }
-  if (pr.changesRequested > 0) {
+  if (pr.approvalsByOthers > 0) {
     return (
-      <span className="pill changes" data-testid="changes-pill">
-        {pr.changesRequested} change{pr.changesRequested === 1 ? "" : "s"} requested
+      <span
+        className="pill approval"
+        data-testid="approval-pill"
+        data-approval={pr.viewerKnown ? "others" : "unknown"}
+      >
+        ✓ {pr.approvalsByOthers} approval{pr.approvalsByOthers === 1 ? "" : "s"}
+        {pr.viewerKnown ? " by others" : ""}
       </span>
     );
   }
   return (
-    <span className="pill muted" data-testid="approval-pill">
-      {pr.approvals} approval{pr.approvals === 1 ? "" : "s"}
+    <span className="pill muted" data-testid="approval-pill" data-approval="none">
+      No approvals
+    </span>
+  );
+}
+
+export function ChangesPill({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="pill changes" data-testid="changes-pill">
+      {count} change{count === 1 ? "" : "s"} requested
     </span>
   );
 }

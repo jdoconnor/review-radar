@@ -2,6 +2,7 @@ import type { PullRequestSummary } from "../lib/types";
 import {
   Age,
   ApprovalPill,
+  ChangesPill,
   CheckPill,
   ConflictPill,
   DraftPill,
@@ -74,7 +75,8 @@ export function PullRequestRow({ pr, kind, selected, onSelect, onMarkSeen }: Pro
       <div className="pr-status">
         {pr.isDraft ? <DraftPill /> : null}
         <TeamReviewPill teams={pr.teamReviewRequests} />
-        {kind === "mine" ? <ApprovalPill pr={pr} /> : null}
+        <ApprovalPill pr={pr} />
+        <ChangesPill count={pr.changesRequested} />
         <CheckPill state={pr.checks.state} failing={pr.checks.failing} total={pr.checks.total} />
         {pr.mergeable === "CONFLICTING" ? <ConflictPill /> : null}
         <NewActivityPill count={pr.newActivity} />

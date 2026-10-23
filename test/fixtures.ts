@@ -77,6 +77,7 @@ export function makePr(overrides: Partial<PullRequestNode> = {}): PullRequestNod
 export function makeSearchPayload(nodes: PullRequestNode[]): SearchPayload {
   return {
     search: { nodes },
+    viewer: { login: "jdoconnor" },
     rateLimit: {
       limit: 5000,
       remaining: 4999,

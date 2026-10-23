@@ -28,6 +28,14 @@ describe("latestReviews", () => {
     ]);
     expect(approvalCount(reviews)).toBe(0);
   });
+
+  it("does not let a later comment revoke an approval", () => {
+    const reviews = latestReviews([
+      { id: "1", state: "APPROVED", submittedAt: "2026-10-19T10:00:00Z", author: { login: "alice" } },
+      { id: "2", state: "COMMENTED", submittedAt: "2026-10-19T12:00:00Z", author: { login: "alice" } },
+    ]);
+    expect(approvalCount(reviews)).toBe(1);
+  });
 });
 
 describe("summarizeChecks", () => {
@@ -118,6 +126,58 @@ describe("toSummary", () => {
     });
     const summary = toSummary(pr, { lastSeenAt: null, reviewRequestedFromMe: false });
     expect(summary.approvals).toBe(1);
+    expect(summary.changesRequested).toBe(1);
+  });
+
+  it("separates the viewer's approval from approvals by others", () => {
+    const pr = makePr({
+      reviews: {
+        nodes: [
+          { id: "1", state: "APPROVED", submittedAt: "2026-10-19T10:00:00Z", author: { login: "alice" } },
+          { id: "2", state: "APPROVED", submittedAt: "2026-10-19T11:00:00Z", author: { login: "jdoconnor" } },
+        ],
+      },
+    });
+    const summary = toSummary(pr, {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+      viewerLogin: "jdoconnor",
+    });
+    expect(summary.approvals).toBe(2);
+    expect(summary.approvedByViewer).toBe(true);
+    expect(summary.approvalsByOthers).toBe(1);
+    expect(summary.viewerKnown).toBe(true);
+  });
+
+  it("marks approvals by others when the viewer has not approved", () => {
+    const pr = makePr();
+    const summary = toSummary(pr, {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+      viewerLogin: "jdoconnor",
+    });
+    expect(summary.approvals).toBe(1);
+    expect(summary.approvedByViewer).toBe(false);
+    expect(summary.approvalsByOthers).toBe(1);
+  });
+
+  it("uses the latest review when the viewer changes their mind", () => {
+    const pr = makePr({
+      reviews: {
+        nodes: [
+          { id: "1", state: "APPROVED", submittedAt: "2026-10-19T10:00:00Z", author: { login: "jdoconnor" } },
+          { id: "2", state: "CHANGES_REQUESTED", submittedAt: "2026-10-19T11:00:00Z", author: { login: "jdoconnor" } },
+        ],
+      },
+    });
+    const summary = toSummary(pr, {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+      viewerLogin: "jdoconnor",
+    });
+    expect(summary.approvals).toBe(0);
+    expect(summary.approvedByViewer).toBe(false);
+    expect(summary.approvalsByOthers).toBe(0);
     expect(summary.changesRequested).toBe(1);
   });
 });

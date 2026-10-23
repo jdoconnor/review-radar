@@ -83,6 +83,7 @@ export interface PullRequestNode {
 
 export interface SearchPayload {
   search: { nodes: Array<PullRequestNode | Record<string, never>> };
+  viewer: { login: string };
   rateLimit: RateLimit;
 }
 
@@ -108,6 +109,9 @@ export interface PullRequestSummary {
   pendingReviewRequests: number;
   teamReviewRequests: string[];
   approvals: number;
+  approvedByViewer: boolean;
+  approvalsByOthers: number;
+  viewerKnown: boolean;
   changesRequested: number;
   comments: number;
   newActivity: number;
