@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
 import { useMediaQuery } from "../hooks/useMediaQuery";
-import { clearCache, pruneCache } from "../lib/cache";
+import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
 import { toSummary } from "../lib/normalize";
@@ -23,6 +23,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [tab, setTab] = useState<Settings["defaultTab"]>(settings.defaultTab);
   const [seenVersion, setSeenVersion] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState<CacheStats | null>(null);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const wide = useMediaQuery("(min-width: 68.75em)");
   const sessionViewer = (() => {
@@ -37,7 +38,8 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     const update = (): void => setOnline(navigator.onLine);
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
-    void pruneCache();
+    // Prune stale responses on startup, but at most once every six hours.
+    void pruneCacheIfDue();
     return () => {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
@@ -104,7 +106,20 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     await clearCache();
     clearLastSeen();
     setSeenVersion((value) => value + 1);
+    setCacheInfo(await cacheStats());
   }, []);
+
+  // Clearing the cache is not signing out: the token and the last-seen marks
+  // stay until the user asks for that separately.
+  const clearLocalCache = useCallback(async (): Promise<void> => {
+    await clearCache();
+    setCacheInfo(await cacheStats());
+  }, []);
+
+  useEffect(() => {
+    if (!showSettings) return;
+    void cacheStats().then(setCacheInfo);
+  }, [showSettings]);
 
   const saveToken = async (token: string): Promise<void> => {
     await resetLocalData();
@@ -263,10 +278,11 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
             </div>
             <SettingsForm
               settings={settings}
+              cacheInfo={cacheInfo}
               onSaveToken={(token) => void saveToken(token)}
               onRefreshChange={(refreshSeconds) => onChange({ ...settings, refreshSeconds })}
               onThemeChange={(nextTheme) => onChange({ ...settings, theme: nextTheme })}
-              onClearCache={() => void resetLocalData()}
+              onClearCache={() => void clearLocalCache()}
               onSignOut={signOut}
             />
           </section>
@@ -278,6 +294,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
 
 function SettingsForm({
   settings,
+  cacheInfo,
   onSaveToken,
   onRefreshChange,
   onThemeChange,
@@ -285,6 +302,7 @@ function SettingsForm({
   onSignOut,
 }: {
   settings: Settings;
+  cacheInfo: CacheStats | null;
   onSaveToken: (token: string) => void;
   onRefreshChange: (seconds: number) => void;
   onThemeChange: (theme: ThemePreference) => void;
@@ -333,6 +351,18 @@ function SettingsForm({
         <option value="light">Light</option>
         <option value="dark">Dark</option>
       </select>
+
+      <p className="hint" data-testid="cache-stats">
+        {cacheInfo
+          ? `${cacheInfo.entries.toLocaleString()} cached ${cacheInfo.entries === 1 ? "response" : "responses"}`
+          : "Checking cached responses…"}
+      </p>
+      {cacheInfo?.quotaExceeded ? (
+        <p className="warning-text" role="status" data-testid="quota-warning">
+          This browser is out of storage. Responses are kept in memory for this session; clear the
+          local cache to make room.
+        </p>
+      ) : null}
 
       <div className="settings-actions">
         <button type="button" className="button tiny" onClick={onClearCache} data-testid="clear-cache">
