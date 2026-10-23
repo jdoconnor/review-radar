@@ -1,10 +1,11 @@
 import type { PullRequestSummary } from "../lib/types";
 import {
   Age,
-  ApprovalPill,
+  ApprovalStatus,
   ChangesPill,
-  CheckPill,
-  ConflictPill,
+  CheckStatus,
+  CommentsStatus,
+  ConflictStatus,
   DraftPill,
   LabelChips,
   NewActivityPill,
@@ -75,13 +76,13 @@ export function PullRequestRow({ pr, kind, selected, onSelect, onMarkSeen }: Pro
       <div className="pr-status">
         {pr.isDraft ? <DraftPill /> : null}
         <TeamReviewPill teams={pr.teamReviewRequests} />
-        <ApprovalPill pr={pr} />
         <ChangesPill count={pr.changesRequested} />
-        <CheckPill state={pr.checks.state} failing={pr.checks.failing} total={pr.checks.total} />
-        {pr.mergeable === "CONFLICTING" ? <ConflictPill /> : null}
         <NewActivityPill count={pr.newActivity} />
-        <span className="comments" title={`${pr.comments} comments`}>
-          💬 {pr.comments}
+        <span className="status-icons" data-testid="status-icons">
+          <ApprovalStatus pr={pr} />
+          <ConflictStatus conflicting={pr.mergeable === "CONFLICTING"} />
+          <CheckStatus state={pr.checks.state} failing={pr.checks.failing} total={pr.checks.total} />
+          <CommentsStatus count={pr.comments} />
         </span>
         {kind === "mine" && pr.newActivity > 0 ? (
           <button

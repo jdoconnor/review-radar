@@ -164,6 +164,45 @@ describe("App", () => {
     expect(screen.getByTestId("approval-pill")).toHaveTextContent("1 approval by others");
   });
 
+  it("shows approval, conflict, CI and comment state as icons with tooltips", async () => {
+    const pr = makePr({
+      id: "status-icons",
+      number: 46,
+      title: "Status icons",
+      mergeable: "CONFLICTING",
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => searchResponse([pr])),
+    );
+
+    render(<App />);
+    expect(await screen.findByText("Status icons")).toBeInTheDocument();
+
+    const approval = screen.getByTestId("approval-pill");
+    expect(approval).toHaveAttribute("title", "1 approval by others");
+    expect(approval).not.toHaveClass("pill");
+
+    const conflict = screen.getByTestId("conflict-pill");
+    expect(conflict).toHaveAttribute("title", "Merge conflicts");
+    expect(conflict).not.toHaveClass("pill");
+
+    const check = screen.getByTestId("check-pill");
+    expect(check).toHaveAttribute("title", "1/2 failing");
+    expect(check).not.toHaveClass("pill");
+
+    const comments = screen.getByTestId("comments");
+    expect(comments).toHaveAttribute("title", "3 comments");
+    expect(comments).not.toHaveClass("pill");
+
+    const statusIcons = screen.getByTestId("status-icons");
+    expect(statusIcons).toContainElement(approval);
+    expect(statusIcons).toContainElement(conflict);
+    expect(statusIcons).toContainElement(check);
+    expect(statusIcons).toContainElement(comments);
+  });
+
   it("shows new activity since the last visit and clears it when marked seen", async () => {
     localStorage.setItem(
       "github-ui.last-seen",
