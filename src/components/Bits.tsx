@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CheckState, PullRequestSummary } from "../lib/types";
 import { checkLabel, relativeTime } from "../lib/normalize";
 
@@ -31,45 +32,154 @@ export function EmptyState({
   );
 }
 
-export function CheckPill({ state, failing, total }: { state: CheckState; failing: number; total: number }) {
-  const label = state === "failure" && failing > 0 ? `${failing}/${total} failing` : checkLabel(state);
+function StatusIcon({
+  children,
+  label,
+  testId,
+  className = "",
+  count,
+  dataApproval,
+}: {
+  children: ReactNode;
+  label: string;
+  testId: string;
+  className?: string;
+  count?: number;
+  dataApproval?: "viewer" | "others" | "unknown" | "none";
+}) {
   return (
-    <span className={`pill check-${state}`} data-testid="check-pill" title={label}>
-      <span className="dot" aria-hidden="true" />
-      {label}
+    <span
+      className={`status-icon ${className}`.trim()}
+      data-testid={testId}
+      data-approval={dataApproval}
+      role="img"
+      aria-label={label}
+      title={label}
+    >
+      <span className="status-glyph" aria-hidden="true">
+        {children}
+      </span>
+      {count != null ? (
+        <span className="status-count" aria-hidden="true">
+          {count}
+        </span>
+      ) : null}
+      <span className="sr-only">{label}</span>
     </span>
   );
 }
 
-export function ApprovalPill({ pr }: { pr: PullRequestSummary }) {
+function ApprovalGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="m5.1 8.2 1.9 1.9 3.9-4.2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CheckGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <path
+        d="M1.75 8h3l1.5-4 3.5 8 1.5-4h3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ConflictGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <path
+        d="M8 2.25 14 13.25H2L8 2.25Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M8 6v3.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="8" cy="11.5" r=".75" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CommentGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <path
+        d="M2.25 3.25h11.5v7.5H7l-3.25 2.5v-2.5h-1.5v-7.5Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function ApprovalStatus({ pr }: { pr: PullRequestSummary }) {
+  const others = pr.approvalsByOthers;
   if (pr.approvedByViewer) {
-    const others = pr.approvalsByOthers;
     const label =
       others > 0
-        ? `✓ You approved (${pr.approvals} approvals, ${others} other${others === 1 ? "" : "s"})`
-        : `✓ You approved (${pr.approvals} approval${pr.approvals === 1 ? "" : "s"})`;
+        ? `You approved (${pr.approvals} approval${pr.approvals === 1 ? "" : "s"}, ${others} other${others === 1 ? "" : "s"})`
+        : `You approved (${pr.approvals} approval${pr.approvals === 1 ? "" : "s"})`;
     return (
-      <span className="pill approval" data-testid="approval-pill" data-approval="viewer">
-        {label}
-      </span>
+      <StatusIcon
+        label={label}
+        testId="approval-pill"
+        className="approval"
+        count={pr.approvals}
+        dataApproval="viewer"
+      >
+        <ApprovalGlyph />
+      </StatusIcon>
     );
   }
   if (pr.approvalsByOthers > 0) {
+    const label = `${pr.approvalsByOthers} approval${pr.approvalsByOthers === 1 ? "" : "s"}${
+      pr.viewerKnown ? " by others" : ""
+    }`;
     return (
-      <span
-        className="pill approval"
-        data-testid="approval-pill"
-        data-approval={pr.viewerKnown ? "others" : "unknown"}
+      <StatusIcon
+        label={label}
+        testId="approval-pill"
+        className="approval"
+        count={pr.approvalsByOthers}
+        dataApproval={pr.viewerKnown ? "others" : "unknown"}
       >
-        ✓ {pr.approvalsByOthers} approval{pr.approvalsByOthers === 1 ? "" : "s"}
-        {pr.viewerKnown ? " by others" : ""}
-      </span>
+        <ApprovalGlyph />
+      </StatusIcon>
     );
   }
   return (
-    <span className="pill muted" data-testid="approval-pill" data-approval="none">
-      No approvals
-    </span>
+    <StatusIcon
+      label="No approvals"
+      testId="approval-pill"
+      className="status-muted"
+      count={0}
+      dataApproval="none"
+    >
+      <ApprovalGlyph />
+    </StatusIcon>
+  );
+}
+
+export function CheckStatus({ state, failing, total }: { state: CheckState; failing: number; total: number }) {
+  const label = state === "failure" && failing > 0 ? `${failing}/${total} failing` : checkLabel(state);
+  return (
+    <StatusIcon label={label} testId="check-pill" className={`check-${state}`}>
+      <CheckGlyph />
+    </StatusIcon>
   );
 }
 
@@ -99,11 +209,21 @@ export function DraftPill() {
   );
 }
 
-export function ConflictPill() {
+export function ConflictStatus({ conflicting }: { conflicting: boolean }) {
+  if (!conflicting) return null;
   return (
-    <span className="pill conflict" data-testid="conflict-pill">
-      Conflicts
-    </span>
+    <StatusIcon label="Merge conflicts" testId="conflict-pill" className="conflict">
+      <ConflictGlyph />
+    </StatusIcon>
+  );
+}
+
+export function CommentsStatus({ count }: { count: number }) {
+  const label = `${count} comment${count === 1 ? "" : "s"}`;
+  return (
+    <StatusIcon label={label} testId="comments" count={count}>
+      <CommentGlyph />
+    </StatusIcon>
   );
 }
 
