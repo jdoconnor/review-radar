@@ -7,7 +7,7 @@ import { evaluateHoldout, formatReport, type EvalReport } from "./evaluate";
 import { run } from "./exec";
 import * as github from "./gh";
 import { assertNoStop, assertWall, changedFiles } from "./guards";
-import { loadScenarios } from "./holdout";
+import { loadScenariosFromCode } from "./holdout";
 import { renderPrompt, type Spec } from "./spec";
 import { commitAll, createWorktree, removeWorktree, type Worktree } from "./worktrees";
 
@@ -168,7 +168,7 @@ export async function runSpec(
 
   if (options.dryRun) {
     const prompt = renderPrompt(spec, config);
-    const scenarios = await loadScenarios(repoRoot(), config);
+    const scenarios = await loadScenariosFromCode(repoRoot(), config);
     console.log("── prompt ─────────────────────────────────────────────");
     console.log(prompt);
     console.log("───────────────────────────────────────────────────────");
@@ -239,7 +239,7 @@ export async function runSpec(
     return outcome;
   }
 
-  const scenarios = await loadScenarios(repoRoot(), config);
+  const scenarios = await loadScenariosFromCode(repoRoot(), config);
   const report = await evaluateHoldout(worktree.path, scenarios, {
     runs: config.eval.runs,
     quorum: config.eval.passQuorum,

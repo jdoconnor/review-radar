@@ -4,7 +4,7 @@ import { loadConfig, repoRoot, type FactoryConfig } from "./config";
 import { evaluateHoldout, formatReport } from "./evaluate";
 import { run } from "./exec";
 import * as github from "./gh";
-import { loadScenarios } from "./holdout";
+import { loadScenariosFromCode, loadScenariosFromGithub } from "./holdout";
 import { runSpec, writeRunReport, type RunOptions } from "./orchestrator";
 import { loadSpec, loadSpecIssues, renderPrompt } from "./spec";
 
@@ -42,7 +42,7 @@ async function doctor(config: FactoryConfig): Promise<void> {
   const repo = ghOk ? await github.repoView(root, config.repo) : null;
   const user = authOk ? await github.currentUser(root) : null;
   const specs = ghOk ? await loadSpecIssues(root, config, { readyOnly: false }) : [];
-  const scenarios = ghOk ? await loadScenarios(root, config) : [];
+  const scenarios = await loadScenariosFromCode(root, config);
   const branch = await run("git", ["branch", "--show-current"], { cwd: root });
   const status = await run("git", ["status", "--porcelain"], { cwd: root });
   const packageJson = existsSync(join(root, "package.json"))
@@ -137,7 +137,7 @@ async function runCommand(config: FactoryConfig): Promise<void> {
 
 async function evalCommand(config: FactoryConfig): Promise<void> {
   const worktree = option("--worktree") ?? repoRoot();
-  const scenarios = await loadScenarios(worktree, config);
+  const scenarios = await loadScenariosFromCode(worktree, config);
   if (scenarios.length === 0) {
     console.error(`No holdout scenarios found. Add issues labeled ${config.labels.holdout}.`);
     process.exitCode = 1;
@@ -158,18 +158,23 @@ async function evalCommand(config: FactoryConfig): Promise<void> {
 }
 
 async function holdout(config: FactoryConfig): Promise<void> {
-  const scenarios = await loadScenarios(repoRoot(), config);
-  if (scenarios.length === 0) {
-    console.log(`No holdout scenarios. Add issues labeled ${config.labels.holdout}.`);
-    return;
-  }
-  for (const scenario of scenarios) {
-    console.log(`#${scenario.number} [${scenario.priority}] ${scenario.title} (${scenario.kind})`);
+  try {
+    const scenarios = await loadScenariosFromCode(repoRoot(), config);
+    console.log("DEBUG: loadScenariosFromCode returned", scenarios.length, "scenarios");
+    if (scenarios.length === 0) {
+      console.log(`No holdout scenarios. Add issues labeled ${config.labels.holdout}.`);
+      return;
+    }
+    for (const scenario of scenarios) {
+      console.log(`#${scenario.number} [${scenario.priority}] ${scenario.title} (${scenario.kind}) file=${scenario.file}`);
+    }
+  } catch (e) {
+    console.error("Error in holdout:", e);
   }
 }
 
 function help(): void {
-  console.log(`github-ui factory — issues in, tested PRs out
+  console.log(`review-radar factory — issues in, tested PRs out
 
 Usage:
   npm run factory -- doctor              Health check: gh, repo, labels, counts

@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { FactoryConfig } from "./config";
 import { factoryPath } from "./config";
 import { run, runShell } from "./exec";
@@ -40,15 +40,38 @@ async function runVitest(
   timeoutMs: number,
 ): Promise<{ ok: boolean; output: string }> {
   if (!scenario.file || !scenario.code) return { ok: false, output: "scenario has no test file/code" };
-  const target = join(worktree, "test", scenario.file);
-  if (existsSync(target)) {
-    return { ok: false, output: `refusing to overwrite existing ${target}` };
+
+  const target = join(worktree, scenario.file);
+  const fileExists = existsSync(target);
+  console.log("DEBUG runVitest: target exists before read =", fileExists);
+  
+  if (!fileExists) {
+    return { ok: false, output: `holdout test file not found: ${target}` };
   }
-  writeFileSync(target, scenario.code, "utf8");
+
+  // Read the code from the permanent file
+  const fs = await import("node:fs");
+  const fileCode = fs.readFileSync(target, "utf8").trim();
+  const fileExistsAfterRead = existsSync(target);
+  console.log("DEBUG runVitest: target exists after read =", fileExistsAfterRead);
+  
+  if (!fileExistsAfterRead) {
+    return { ok: false, output: `holdout test file disappeared after read: ${target}` };
+  }
+
+  if (!fileCode) {
+    return { ok: false, output: `holdout test file is empty: ${target}` };
+  }
+
+  // Write the code to a temp location for vitest to avoid conflicting with permanent file
+  const tempTarget = join(worktree, "test", scenario.file.replace(/^test\//, ""));
+  mkdirSync(dirname(tempTarget), { recursive: true });
+  writeFileSync(tempTarget, fileCode, "utf8");
+
   try {
     const result = await run(
       "npx",
-      ["--no-install", "vitest", "run", "--config", "vitest.holdout.config.ts", `test/${scenario.file}`, "--reporter=dot"],
+      ["--no-install", "vitest", "run", "--config", "vitest.holdout.config.ts", `test/${scenario.file.replace(/^test\//, "")}`, "--reporter=dot"],
       { cwd: worktree, timeoutMs },
     );
     return {
@@ -56,7 +79,10 @@ async function runVitest(
       output: `${result.stdout}\n${result.stderr}`.trim(),
     };
   } finally {
-    rmSync(target, { force: true });
+    // Clean up the temp file, but leave the permanent .heldout.tsx file intact
+    if (existsSync(tempTarget)) {
+      rmSync(tempTarget, { force: true, recursive: true });
+    }
   }
 }
 
