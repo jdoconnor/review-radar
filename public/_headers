@@ -1,0 +1,12 @@
+# Cloudflare Pages headers. The app is static; these headers are the only
+# server-side policy, and they deliberately allow network traffic only to the
+# GitHub GraphQL API.
+#
+# GitHub Enterprise users must add their host to connect-src and img-src.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://avatars.githubusercontent.com https://github.com; connect-src 'self' https://api.github.com; font-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'; upgrade-insecure-requests
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Cross-Origin-Opener-Policy: same-origin

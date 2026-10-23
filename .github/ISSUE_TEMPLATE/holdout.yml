@@ -1,0 +1,41 @@
+name: Holdout scenario
+description: An acceptance scenario the coding agent must never read. The evaluator runs the Machine block.
+title: "[holdout] "
+labels: ["factory:holdout"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This issue is behind the wall. Do not reference it from a spec, a PR description, or a
+        comment the agent might read. Use `kind: vitest` with a `file` and a code block, or
+        `kind: command` with a shell block.
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario
+      description: Plain-English acceptance criteria. Be strict about the observable outcome.
+      placeholder: "A PR with a failing check shows the red CI pill and sorts ahead of a green PR."
+    validations:
+      required: true
+  - type: textarea
+    id: machine
+    attributes:
+      label: Machine
+      description: JSON metadata followed by the test code or shell command. The evaluator runs this verbatim.
+      value: |
+        ## Machine
+        ```json
+        {"kind":"vitest","file":"example.heldout.tsx","priority":"P1"}
+        ```
+
+        ```tsx
+        import { render, screen } from "@testing-library/react";
+        import { expect, it } from "vitest";
+        import { App } from "../src/App";
+
+        it("does the thing", () => {
+          // ...
+        });
+        ```
+    validations:
+      required: true

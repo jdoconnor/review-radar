@@ -1,0 +1,28 @@
+name: Holdout gate
+
+# The evaluator is the only job that may read factory:holdout issues. It runs
+# after CI, against the PR head, and fails the PR when the acceptance suite is
+# not green. The coding agent never gets this token.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  holdout:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Run acceptance scenarios
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run factory -- eval

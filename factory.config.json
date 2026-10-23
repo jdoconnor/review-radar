@@ -1,0 +1,39 @@
+{
+  "repo": "jdoconnor/github-ui",
+  "labels": {
+    "spec": "factory:spec",
+    "ready": "factory:ready",
+    "holdout": "factory:holdout",
+    "blocked": "factory:blocked",
+    "automerge": "factory:automerge",
+    "manual": "factory:manual"
+  },
+  "codingAgent": {
+    "adapter": "opencode",
+    "model": "opencode/deepseek-v4.1-flash-free",
+    "agent": "build",
+    "maxAttempts": 3,
+    "timeoutMinutes": 30
+  },
+  "eval": {
+    "runs": 1,
+    "passQuorum": 1,
+    "gate": 1
+  },
+  "autoMerge": {
+    "enabled": true,
+    "dryRun": false,
+    "mergeMethod": "squash",
+    "label": "factory:automerge"
+  },
+  "worktrees": {
+    "dir": ".factory/worktrees",
+    "nodeModules": "symlink",
+    "cleanup": false,
+    "fetch": true,
+    "base": "main"
+  },
+  "limits": {
+    "maxAttemptsPerIssue": 3
+  }
+}
