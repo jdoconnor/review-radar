@@ -68,12 +68,16 @@ export function TokenSetup({ onSave, theme, onToggleTheme }: Props) {
             placeholder="github_pat_…"
             value={token}
             onChange={(event) => setToken(event.target.value)}
-            aria-describedby="token-help"
+            aria-describedby="token-help token-storage-note"
           />
           <p id="token-help" className="hint">
-            Stored only in this browser. Fine-grained token: Pull requests, Issues, Contents, Checks,
-            Commit statuses and Metadata (read-only). Add Members (read-only) for team review
-            requests. Classic token: <code>repo</code> and <code>read:org</code>.
+            Fine-grained token: Pull requests, Issues, Contents, Checks, Commit statuses and Metadata
+            (read-only). Add Members (read-only) for team review requests. Classic token:{" "}
+            <code>repo</code> and <code>read:org</code>.
+          </p>
+          <p id="token-storage-note" className="hint" data-testid="token-storage-note">
+            The token is stored in this browser, never sent to us, and cleared when you sign out.
+            Responses stay in a local cache on this device.
           </p>
           {error ? (
             <p className="error-text" role="alert" data-testid="setup-error">

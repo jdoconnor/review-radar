@@ -342,7 +342,10 @@ function SettingsForm({
           Sign out
         </button>
       </div>
-      <p className="hint">The token stays in this browser. Clearing the cache removes responses, not the token.</p>
+      <p className="hint" data-testid="token-storage-note">
+        The token is stored in this browser, never sent to us, and cleared when you sign out.
+        Clearing the cache removes responses, not the token.
+      </p>
     </div>
   );
 }
