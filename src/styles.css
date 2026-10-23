@@ -827,6 +827,12 @@ kbd {
   font-size: 12.5px;
 }
 
+.warning-text {
+  margin: 0.125rem 0;
+  color: var(--amber);
+  font-size: 0.8125rem;
+}
+
 .setup-points {
   margin: 22px 0 0;
   padding: 16px 0 0 18px;
