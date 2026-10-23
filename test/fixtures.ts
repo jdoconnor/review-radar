@@ -6,7 +6,7 @@ export function makePr(overrides: Partial<PullRequestNode> = {}): PullRequestNod
     id: "PR_1",
     number: 42,
     title: "Add a review queue",
-    url: "https://github.com/jdoconnor/github-ui/pull/42",
+    url: "https://github.com/jdoconnor/review-radar/pull/42",
     isDraft: false,
     createdAt: "2026-10-18T12:00:00.000Z",
     updatedAt: now,
@@ -15,7 +15,7 @@ export function makePr(overrides: Partial<PullRequestNode> = {}): PullRequestNod
     changedFiles: 6,
     mergeable: "MERGEABLE",
     reviewDecision: "REVIEW_REQUIRED",
-    repository: { nameWithOwner: "jdoconnor/github-ui" },
+    repository: { nameWithOwner: "jdoconnor/review-radar" },
     author: { login: "jdoconnor", avatarUrl: "https://example.com/avatar.png" },
     labels: { nodes: [{ name: "feature", color: "6ea8fe" }] },
     reviewRequests: {

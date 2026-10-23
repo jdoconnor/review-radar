@@ -1,7 +1,7 @@
 (function () {
   var stored = null;
   try {
-    stored = window.localStorage.getItem("github-ui.theme");
+    stored = window.localStorage.getItem("review-radar.theme");
   } catch (error) {
     stored = null;
   }

@@ -28,7 +28,7 @@ export function TokenSetup({ onSave, theme, onToggleTheme }: Props) {
     try {
       const result = await fetchGraphQL<ViewerPayload>(trimmed, VIEWER_QUERY, {});
       onSave(trimmed);
-      sessionStorage.setItem("github-ui.viewer", result.data.viewer.login);
+      sessionStorage.setItem("review-radar.viewer", result.data.viewer.login);
     } catch (caught) {
       const message =
         caught instanceof GithubError

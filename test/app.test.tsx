@@ -5,7 +5,7 @@ import { App } from "../src/App";
 import { clearCache } from "../src/lib/cache";
 import { makePr, makeSearchPayload } from "./fixtures";
 
-const PR_URL = "https://github.com/jdoconnor/github-ui/pull/42";
+const PR_URL = "https://github.com/jdoconnor/review-radar/pull/42";
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
@@ -43,7 +43,7 @@ function stubWideScreen(): void {
 beforeEach(async () => {
   await clearCache();
   sessionStorage.clear();
-  localStorage.setItem("github-ui.token", "test-token");
+  localStorage.setItem("review-radar.token", "test-token");
 });
 
 afterEach(() => {
@@ -57,7 +57,7 @@ describe("App", () => {
       id: "mine",
       number: 43,
       title: "My open pull request",
-      url: "https://github.com/jdoconnor/github-ui/pull/43",
+      url: "https://github.com/jdoconnor/review-radar/pull/43",
     });
 
     vi.stubGlobal(
@@ -90,7 +90,7 @@ describe("App", () => {
       id: "mine",
       number: 43,
       title: "My open pull request",
-      url: "https://github.com/jdoconnor/github-ui/pull/43",
+      url: "https://github.com/jdoconnor/review-radar/pull/43",
     });
 
     vi.stubGlobal(
@@ -291,8 +291,8 @@ describe("App", () => {
 
   it("shows new activity since the last visit and clears it when marked seen", async () => {
     localStorage.setItem(
-      "github-ui.last-seen",
-      JSON.stringify({ "jdoconnor/github-ui#42": Date.parse("2026-10-20T09:00:00Z") }),
+      "review-radar.last-seen",
+      JSON.stringify({ "jdoconnor/review-radar#42": Date.parse("2026-10-20T09:00:00Z") }),
     );
 
     vi.stubGlobal(
@@ -381,7 +381,7 @@ describe("App", () => {
   });
 
   it("switches between dark and light themes and remembers the choice", async () => {
-    localStorage.setItem("github-ui.theme", "dark");
+    localStorage.setItem("review-radar.theme", "dark");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => searchResponse([makePr()])),
@@ -398,12 +398,12 @@ describe("App", () => {
     await userEvent.click(toggle);
 
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(localStorage.getItem("github-ui.theme")).toBe("light");
+    expect(localStorage.getItem("review-radar.theme")).toBe("light");
     expect(toggle).toHaveAccessibleName("Switch to dark theme");
   });
 
   it("offers an explicit theme choice in settings", async () => {
-    localStorage.setItem("github-ui.theme", "dark");
+    localStorage.setItem("review-radar.theme", "dark");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => searchResponse([makePr()])),
@@ -420,12 +420,12 @@ describe("App", () => {
     await userEvent.selectOptions(select, "light");
 
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(localStorage.getItem("github-ui.theme")).toBe("light");
+    expect(localStorage.getItem("review-radar.theme")).toBe("light");
   });
 
   it("themes the token setup screen and toggles before sign-in", async () => {
-    localStorage.removeItem("github-ui.token");
-    localStorage.setItem("github-ui.theme", "dark");
+    localStorage.removeItem("review-radar.token");
+    localStorage.setItem("review-radar.theme", "dark");
 
     render(<App />);
 
@@ -434,6 +434,6 @@ describe("App", () => {
     await userEvent.click(screen.getByTestId("theme-toggle"));
 
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(localStorage.getItem("github-ui.theme")).toBe("light");
+    expect(localStorage.getItem("review-radar.theme")).toBe("light");
   });
 });

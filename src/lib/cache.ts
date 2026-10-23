@@ -31,12 +31,12 @@ export interface CacheStats {
   quotaExceeded: boolean;
 }
 
-const DB_NAME = "github-ui";
+const DB_NAME = "review-radar";
 const STORE = "responses";
 const DB_VERSION = 1;
 const DEFAULT_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 14;
-const CHANNEL_NAME = "github-ui.cache";
-const PRUNE_STAMP_KEY = "github-ui.cache-pruned-at";
+const CHANNEL_NAME = "review-radar.cache";
+const PRUNE_STAMP_KEY = "review-radar.cache-pruned-at";
 const PRUNE_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const QUOTA_PRUNE_FRACTION = 0.2;
 

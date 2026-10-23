@@ -1,4 +1,4 @@
-# github-ui
+# review-radar
 
 A cache-first GitHub review dashboard. Two questions, one screen:
 
@@ -28,7 +28,7 @@ Walking skeleton on `main`:
 - unit + component tests, production build
 
 The rest of the work lives in **GitHub issues**, not Markdown files. See the
-[epic](https://github.com/jdoconnor/github-ui/issues/17) and
+[epic](https://github.com/jdoconnor/review-radar/issues/17) and
 [`AGENTS.md`](AGENTS.md).
 
 ## Run it
@@ -85,7 +85,7 @@ The app is a static Vite build served by Cloudflare Workers Static Assets. There
 is no Worker script, Pages Function, or proxy in this project, so the token
 never reaches Cloudflare.
 
-- Worker name: `github-ui`
+- Worker name: `review-radar`
 - Production branch: `main`
 - Build command: leave empty
 - Deploy command: `npx wrangler deploy`

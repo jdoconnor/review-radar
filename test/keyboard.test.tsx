@@ -39,7 +39,7 @@ const SECOND = makePr({
   id: "review-second",
   number: 43,
   title: "Newer review request",
-  url: "https://github.com/jdoconnor/github-ui/pull/43",
+  url: "https://github.com/jdoconnor/review-radar/pull/43",
   createdAt: "2026-10-18T12:00:00.000Z",
 });
 
@@ -47,7 +47,7 @@ const MINE = makePr({
   id: "mine",
   number: 44,
   title: "My open pull request",
-  url: "https://github.com/jdoconnor/github-ui/pull/44",
+  url: "https://github.com/jdoconnor/review-radar/pull/44",
 });
 
 function stubFetch(reviewNodes: unknown[] = [FIRST, SECOND], mineNodes: unknown[] = [MINE]): void {
@@ -93,7 +93,7 @@ beforeEach(async () => {
   await clearCache();
   sessionStorage.clear();
   localStorage.clear();
-  localStorage.setItem("github-ui.token", "test-token");
+  localStorage.setItem("review-radar.token", "test-token");
 });
 
 afterEach(() => {

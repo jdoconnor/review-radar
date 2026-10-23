@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "github-ui",
+  "name": "review-radar",
   // Set this to today's date.
   "compatibility_date": "2026-10-22",
   // Build the Vite bundle before Wrangler uploads assets. Workers Builds may
