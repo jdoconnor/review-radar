@@ -225,3 +225,126 @@ describe("filterSummaries", () => {
     ).toHaveLength(0);
   });
 });
+
+const BASE_FILTERS = {
+  text: "",
+  repo: "",
+  onlyFailing: false,
+  onlyChanges: false,
+  onlyNew: false,
+  onlyDirect: false,
+  onlyTeam: false,
+};
+
+function summaryWithReviewers(
+  number: number,
+  nodes: Array<{ requestedReviewer: { __typename: "User"; login: string } | { __typename: "Team"; name: string; slug: string } | null }>,
+) {
+  return toSummary(
+    makePr({
+      id: `pr-${number}`,
+      number,
+      title: `Pull request ${number}`,
+      reviewRequests: { totalCount: nodes.length, nodes },
+    }),
+    { lastSeenAt: null, reviewRequestedFromMe: true, viewerLogin: "jdoconnor" },
+  );
+}
+
+describe("review request kinds", () => {
+  it("marks a direct request when the viewer is named", () => {
+    const summary = summaryWithReviewers(1, [
+      { requestedReviewer: { __typename: "User", login: "jdoconnor" } },
+    ]);
+    expect(summary.directReviewRequest).toBe(true);
+    expect(summary.teamReviewRequests).toEqual([]);
+  });
+
+  it("compares logins case-insensitively and ignores other people", () => {
+    const summary = summaryWithReviewers(2, [
+      { requestedReviewer: { __typename: "User", login: "JDOCONNOR" } },
+      { requestedReviewer: { __typename: "User", login: "someone-else" } },
+    ]);
+    expect(summary.directReviewRequest).toBe(true);
+
+    const other = summaryWithReviewers(3, [
+      { requestedReviewer: { __typename: "User", login: "someone-else" } },
+    ]);
+    expect(other.directReviewRequest).toBe(false);
+  });
+
+  it("does not guess a direct request when the viewer is unknown", () => {
+    const summary = toSummary(
+      makePr({
+        reviewRequests: {
+          totalCount: 1,
+          nodes: [{ requestedReviewer: { __typename: "User", login: "jdoconnor" } }],
+        },
+      }),
+      { lastSeenAt: null, reviewRequestedFromMe: true },
+    );
+    expect(summary.directReviewRequest).toBe(false);
+  });
+
+  it("collects team names, falls back to the slug, and drops nameless teams", () => {
+    const summary = summaryWithReviewers(4, [
+      { requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } },
+      { requestedReviewer: { __typename: "Team", name: "", slug: "design" } },
+      { requestedReviewer: { __typename: "Team", name: "  ", slug: "  " } },
+      { requestedReviewer: null },
+    ]);
+    expect(summary.teamReviewRequests).toEqual(["Platform", "design"]);
+    expect(summary.directReviewRequest).toBe(false);
+  });
+
+  it("deduplicates a team that appears twice", () => {
+    const summary = summaryWithReviewers(5, [
+      { requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } },
+      { requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } },
+    ]);
+    expect(summary.teamReviewRequests).toEqual(["Platform"]);
+  });
+
+  it("reports both kinds at once", () => {
+    const summary = summaryWithReviewers(6, [
+      { requestedReviewer: { __typename: "User", login: "jdoconnor" } },
+      { requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } },
+    ]);
+    expect(summary.directReviewRequest).toBe(true);
+    expect(summary.teamReviewRequests).toEqual(["Platform"]);
+  });
+
+  it("filters by kind and composes with the text filter", () => {
+    const direct = summaryWithReviewers(7, [
+      { requestedReviewer: { __typename: "User", login: "jdoconnor" } },
+    ]);
+    const team = summaryWithReviewers(8, [
+      { requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } },
+    ]);
+    const both = summaryWithReviewers(9, [
+      { requestedReviewer: { __typename: "User", login: "jdoconnor" } },
+      { requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } },
+    ]);
+    const neither = summaryWithReviewers(10, [
+      { requestedReviewer: { __typename: "User", login: "someone-else" } },
+    ]);
+
+    expect(filterSummaries([direct, team, both, neither], { ...BASE_FILTERS, onlyDirect: true })).toEqual([
+      direct,
+      both,
+    ]);
+    expect(filterSummaries([direct, team, both, neither], { ...BASE_FILTERS, onlyTeam: true })).toEqual([
+      team,
+      both,
+    ]);
+    expect(
+      filterSummaries([direct, team, both, neither], { ...BASE_FILTERS, onlyDirect: true, onlyTeam: true }),
+    ).toEqual([both]);
+    expect(
+      filterSummaries([direct, team, both, neither], { ...BASE_FILTERS, onlyTeam: true, text: "9" }),
+    ).toEqual([both]);
+    expect(filterSummaries([direct, team, both, neither], { ...BASE_FILTERS, onlyTeam: true, text: "7" })).toEqual(
+      [],
+    );
+  });
+});

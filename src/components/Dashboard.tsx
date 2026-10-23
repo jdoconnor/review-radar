@@ -154,6 +154,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       filters={filters}
       sort={sort}
       searchRef={searchRef}
+      viewerLogin={viewerLogin}
       error={reviewQuery.error}
       warning={reviewQuery.warning}
       stale={reviewQuery.stale}
@@ -175,6 +176,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       filters={filters}
       sort={sort}
       searchRef={searchRef}
+      viewerLogin={viewerLogin}
       error={mineQuery.error}
       warning={mineQuery.warning}
       stale={mineQuery.stale}
@@ -267,7 +269,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
           sort={sort}
           onSortChange={setSort}
           repos={repos}
-          showQuickFilters={wide || tab === "mine"}
+          view={wide ? "both" : tab}
           refreshing={reviewQuery.refreshing || mineQuery.refreshing}
           onRefresh={refreshAll}
           searchRef={searchRef}

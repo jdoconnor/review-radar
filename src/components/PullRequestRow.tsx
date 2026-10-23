@@ -6,6 +6,7 @@ import {
   CheckStatus,
   CommentsStatus,
   ConflictStatus,
+  DirectReviewPill,
   DraftPill,
   LabelChips,
   NewActivityPill,
@@ -15,12 +16,13 @@ import {
 interface Props {
   pr: PullRequestSummary;
   kind: "review" | "mine";
+  viewerLogin: string | null;
   selected: boolean;
   onSelect: () => void;
   onMarkSeen: (key: string) => void;
 }
 
-export function PullRequestRow({ pr, kind, selected, onSelect, onMarkSeen }: Props) {
+export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMarkSeen }: Props) {
   return (
     <article
       className={`pr-row ${selected ? "selected" : ""} ${kind === "review" ? "needs-review" : ""}`}
@@ -75,6 +77,9 @@ export function PullRequestRow({ pr, kind, selected, onSelect, onMarkSeen }: Pro
 
       <div className="pr-status">
         {pr.isDraft ? <DraftPill /> : null}
+        {kind === "review" && pr.directReviewRequest ? (
+          <DirectReviewPill viewer={viewerLogin} />
+        ) : null}
         <TeamReviewPill teams={pr.teamReviewRequests} />
         <ChangesPill count={pr.changesRequested} />
         <NewActivityPill count={pr.newActivity} />

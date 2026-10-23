@@ -153,6 +153,18 @@ describe("keyboard navigation", () => {
     expect(selected(within(queue).getAllByTestId("pr-row"))).toEqual([]);
   });
 
+  it("responds to j pressed as soon as the rows commit", async () => {
+    stubFetch();
+    render(<App />);
+    const queue = await screen.findByTestId("review-queue");
+    // Deliberately synchronous: the rows exist before React has re-registered a
+    // listener, which used to leave the keypress with an empty row list.
+    const rows = within(queue).getAllByTestId("pr-row");
+
+    fireEvent.keyDown(window, { key: "j" });
+    expect(rows[0]?.dataset.selected).toBe("true");
+  });
+
   it("keeps the selected row across a manual refresh", async () => {
     stubFetch();
     const rows = await renderReviewQueue();
