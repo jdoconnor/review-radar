@@ -106,6 +106,8 @@ export interface PullRequestSummary {
   reviewDecision: PullRequestNode["reviewDecision"];
   labels: LabelNode[];
   reviewRequestedFromMe: boolean;
+  /** A `User` reviewer in `reviewRequests` is the viewer. */
+  directReviewRequest: boolean;
   pendingReviewRequests: number;
   teamReviewRequests: string[];
   approvals: number;

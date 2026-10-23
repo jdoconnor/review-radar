@@ -6,6 +6,8 @@ export interface Filters {
   onlyFailing: boolean;
   onlyChanges: boolean;
   onlyNew: boolean;
+  onlyDirect: boolean;
+  onlyTeam: boolean;
 }
 
 export type SortOrder = "default" | "attention" | "oldest" | "newest";
@@ -16,6 +18,8 @@ export const EMPTY_FILTERS: Filters = {
   onlyFailing: false,
   onlyChanges: false,
   onlyNew: false,
+  onlyDirect: false,
+  onlyTeam: false,
 };
 
 export function hasActiveFilters(filters: Filters): boolean {
@@ -24,7 +28,9 @@ export function hasActiveFilters(filters: Filters): boolean {
     filters.repo !== "" ||
     filters.onlyFailing ||
     filters.onlyChanges ||
-    filters.onlyNew
+    filters.onlyNew ||
+    filters.onlyDirect ||
+    filters.onlyTeam
   );
 }
 
@@ -34,7 +40,8 @@ interface Props {
   sort: SortOrder;
   onSortChange: (sort: SortOrder) => void;
   repos: string[];
-  showQuickFilters: boolean;
+  /** Which queues the toolbar is driving, so only relevant chips render. */
+  view: "review" | "mine" | "both";
   refreshing: boolean;
   onRefresh: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -46,7 +53,7 @@ export function ListToolbar({
   sort,
   onSortChange,
   repos,
-  showQuickFilters,
+  view,
   refreshing,
   onRefresh,
   searchRef,
@@ -95,7 +102,31 @@ export function ListToolbar({
         <option value="newest">Recently updated</option>
         <option value="attention">Needs attention</option>
       </select>
-      {showQuickFilters ? (
+      {view !== "mine" ? (
+        <div className="chips" role="group" aria-label="Review request filters">
+          <button
+            type="button"
+            className={`chip ${filters.onlyDirect ? "active" : ""}`}
+            aria-pressed={filters.onlyDirect}
+            title="Only pull requests where a review was requested from you directly"
+            onClick={() => onFiltersChange({ ...filters, onlyDirect: !filters.onlyDirect })}
+            data-testid="filter-direct"
+          >
+            Direct only
+          </button>
+          <button
+            type="button"
+            className={`chip ${filters.onlyTeam ? "active" : ""}`}
+            aria-pressed={filters.onlyTeam}
+            title="Only pull requests where a team you belong to was asked to review"
+            onClick={() => onFiltersChange({ ...filters, onlyTeam: !filters.onlyTeam })}
+            data-testid="filter-team"
+          >
+            Team only
+          </button>
+        </div>
+      ) : null}
+      {view !== "review" ? (
         <div className="chips" role="group" aria-label="Quick filters">
           <button
             type="button"

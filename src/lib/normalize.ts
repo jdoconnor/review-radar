@@ -83,13 +83,38 @@ export function changesRequestedCount(reviews: ReviewNode[]): number {
   return latestReviews(reviews).filter((review) => review.state === "CHANGES_REQUESTED").length;
 }
 
+/**
+ * Team names from the `reviewRequests` union. GitHub can omit a team's name and
+ * only send the slug, and either can be blank on a deleted team; a nameless
+ * entry is dropped rather than rendered as "undefined".
+ */
 export function teamReviewRequests(pr: PullRequestNode): string[] {
   const nodes = pr.reviewRequests?.nodes ?? [];
   const teams: string[] = [];
   for (const node of nodes) {
-    if (node.requestedReviewer?.__typename === "Team") teams.push(node.requestedReviewer.name);
+    const reviewer = node.requestedReviewer;
+    if (reviewer?.__typename !== "Team") continue;
+    const name = (reviewer.name ?? "").trim() || (reviewer.slug ?? "").trim();
+    if (!name || teams.includes(name)) continue;
+    teams.push(name);
   }
   return teams;
+}
+
+/**
+ * True when the viewer is named directly in `reviewRequests`. Team requests do
+ * not count: they are surfaced separately by `teamReviewRequests`.
+ */
+export function directReviewRequest(pr: PullRequestNode, viewerLogin?: string | null): boolean {
+  const viewer = viewerLogin?.trim().toLowerCase();
+  if (!viewer) return false;
+  const nodes = pr.reviewRequests?.nodes ?? [];
+  return nodes.some((node) => {
+    const reviewer = node.requestedReviewer;
+    return (
+      reviewer?.__typename === "User" && (reviewer.login ?? "").trim().toLowerCase() === viewer
+    );
+  });
 }
 
 function activityAfter(pr: PullRequestNode, lastSeenAt: number | null): number {
@@ -141,6 +166,7 @@ export function toSummary(
     reviewDecision: pr.reviewDecision,
     labels: pr.labels?.nodes ?? [],
     reviewRequestedFromMe: options.reviewRequestedFromMe,
+    directReviewRequest: directReviewRequest(pr, viewerLogin),
     pendingReviewRequests: pr.reviewRequests?.totalCount ?? 0,
     teamReviewRequests: teamReviewRequests(pr),
     approvals: approvals.length,
@@ -175,7 +201,15 @@ export function sortForAttention(items: PullRequestSummary[]): PullRequestSummar
 
 export function filterSummaries(
   items: PullRequestSummary[],
-  filters: { text: string; repo: string; onlyFailing: boolean; onlyChanges: boolean; onlyNew: boolean },
+  filters: {
+    text: string;
+    repo: string;
+    onlyFailing: boolean;
+    onlyChanges: boolean;
+    onlyNew: boolean;
+    onlyDirect?: boolean;
+    onlyTeam?: boolean;
+  },
 ): PullRequestSummary[] {
   const text = filters.text.trim().toLowerCase();
   return items.filter((pr) => {
@@ -183,6 +217,8 @@ export function filterSummaries(
     if (filters.onlyFailing && pr.checks.state !== "failure") return false;
     if (filters.onlyChanges && pr.changesRequested === 0) return false;
     if (filters.onlyNew && pr.newActivity === 0) return false;
+    if (filters.onlyDirect && !pr.directReviewRequest) return false;
+    if (filters.onlyTeam && pr.teamReviewRequests.length === 0) return false;
     if (!text) return true;
     const haystack = [pr.title, pr.repo, pr.author, String(pr.number), ...pr.labels.map((label) => label.name)]
       .join(" ")

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { GithubError } from "../lib/github";
 import { filterSummaries, sortForAttention } from "../lib/normalize";
@@ -17,6 +17,7 @@ interface Props {
   filters: Filters;
   sort: SortOrder;
   searchRef: RefObject<HTMLInputElement | null>;
+  viewerLogin: string | null;
   error: GithubError | null;
   warning: string | null;
   stale: boolean;
@@ -36,6 +37,7 @@ export function PullRequestList({
   filters,
   sort,
   searchRef,
+  viewerLogin,
   error,
   warning,
   stale,
@@ -46,8 +48,13 @@ export function PullRequestList({
 }: Props) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
+  // Review requests have no last-seen mark, and my own pull requests are never
+  // requested from me, so each queue ignores the other queue's chips.
   const effectiveFilters = useMemo(
-    () => (kind === "review" ? { ...filters, onlyNew: false } : filters),
+    () =>
+      kind === "review"
+        ? { ...filters, onlyNew: false }
+        : { ...filters, onlyDirect: false, onlyTeam: false },
     [filters, kind],
   );
   const effectiveSort = sort === "default" ? (kind === "review" ? "oldest" : "attention") : sort;
@@ -67,9 +74,23 @@ export function PullRequestList({
     if (selectedKey && !visible.some((item) => item.key === selectedKey)) setSelectedKey(null);
   }, [visible, selectedKey]);
 
+  // The listener is registered once and reads the latest props from a ref that
+  // is updated during render. Re-registering it from an effect keyed on the rows
+  // left a window where a key pressed as the rows committed ran the previous
+  // listener, whose row list was still empty, so nothing was selected.
+  const latest = useRef({ active, visible, selectedKey, onMarkSeen, onRefresh });
+  latest.current = { active, visible, selectedKey, onMarkSeen, onRefresh };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (!active) return;
+      const {
+        active: isActive,
+        visible: rows,
+        selectedKey: current,
+        onMarkSeen: markSeen,
+        onRefresh: refresh,
+      } = latest.current;
+      if (!isActive) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
@@ -78,23 +99,26 @@ export function PullRequestList({
       }
       if (event.metaKey || event.ctrlKey || event.altKey) return;
 
-      const index = visible.findIndex((item) => item.key === selectedKey);
       if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
-        const next = visible[Math.min(index + 1, visible.length - 1)];
-        if (next) setSelectedKey(next.key);
+        setSelectedKey((value) => {
+          const index = rows.findIndex((item) => item.key === value);
+          return rows[Math.min(index + 1, rows.length - 1)]?.key ?? value;
+        });
       } else if (event.key === "k" || event.key === "ArrowUp") {
         event.preventDefault();
-        const previous = visible[Math.max(index - 1, 0)];
-        if (previous) setSelectedKey(previous.key);
+        setSelectedKey((value) => {
+          const index = rows.findIndex((item) => item.key === value);
+          return rows[Math.max(index - 1, 0)]?.key ?? value;
+        });
       } else if (event.key === "Enter" || event.key === "o") {
-        const selected = visible.find((item) => item.key === selectedKey);
+        const selected = rows.find((item) => item.key === current);
         if (selected) window.open(selected.url, "_blank", "noopener,noreferrer");
       } else if (event.key === "m") {
-        const selected = visible.find((item) => item.key === selectedKey);
-        if (selected && selected.newActivity > 0) onMarkSeen(selected.key);
+        const selected = rows.find((item) => item.key === current);
+        if (selected && selected.newActivity > 0) markSeen(selected.key);
       } else if (event.key === "r") {
-        onRefresh();
+        refresh();
       } else if (event.key === "/") {
         event.preventDefault();
         searchRef.current?.focus();
@@ -102,7 +126,7 @@ export function PullRequestList({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, visible, selectedKey, onMarkSeen, onRefresh, searchRef]);
+  }, [searchRef]);
 
   const hasFilters = hasActiveFilters(effectiveFilters);
 
@@ -192,6 +216,7 @@ export function PullRequestList({
               key={pr.key}
               pr={pr}
               kind={kind}
+              viewerLogin={viewerLogin}
               selected={selectedKey === pr.key}
               onSelect={() => setSelectedKey(pr.key)}
               onMarkSeen={onMarkSeen}

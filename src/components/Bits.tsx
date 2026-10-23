@@ -227,6 +227,18 @@ export function CommentsStatus({ count }: { count: number }) {
   );
 }
 
+export function DirectReviewPill({ viewer }: { viewer: string | null }) {
+  return (
+    <span
+      className="pill direct"
+      data-testid="direct-review"
+      title={viewer ? `Review requested from @${viewer}` : "Review requested from you"}
+    >
+      Direct
+    </span>
+  );
+}
+
 export function TeamReviewPill({ teams }: { teams: string[] }) {
   if (teams.length === 0) return null;
   return (
