@@ -74,7 +74,7 @@ export interface PullRequestNode {
       commit: {
         statusCheckRollup: {
           state: string;
-          contexts: { totalCount: number; nodes: CheckContextNode[] } | null;
+          contexts: { totalCount: number; nodes: Array<CheckContextNode | null> } | null;
         } | null;
       };
     } | null>;
