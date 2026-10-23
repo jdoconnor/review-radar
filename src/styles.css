@@ -18,9 +18,71 @@
   --amber: #d29922;
   --amber-soft: #3b2f14;
   --purple: #bc8cff;
+  --page-glow-accent: rgba(110, 168, 254, 0.08);
+  --page-glow-purple: rgba(188, 140, 255, 0.06);
+  --topbar-bg: rgba(11, 14, 19, 0.88);
+  --focus-ring: 0 0 0 3px rgba(110, 168, 254, 0.16);
+  --accent-soft: rgba(110, 168, 254, 0.12);
+  --primary-text: #08111f;
+  --row-sheen: rgba(255, 255, 255, 0.018);
+  --selected-ring: 0 0 0 1px rgba(110, 168, 254, 0.35);
+  --review-flag-bg: rgba(110, 168, 254, 0.14);
+  --accent-border: rgba(110, 168, 254, 0.35);
+  --green-border: rgba(63, 185, 80, 0.4);
+  --red-border: rgba(248, 81, 73, 0.45);
+  --amber-border: rgba(210, 153, 34, 0.45);
+  --purple-border: rgba(188, 140, 255, 0.45);
+  --purple-soft: rgba(188, 140, 255, 0.12);
+  --empty-bg: rgba(17, 22, 30, 0.5);
+  --card-sheen: rgba(255, 255, 255, 0.025);
+  --card-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  --backdrop: rgba(0, 0, 0, 0.6);
+  --modal-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
   --radius: 10px;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f8fb;
+  --bg-raised: #ffffff;
+  --bg-hover: #eef2f8;
+  --surface: #f1f5fa;
+  --border: #d6dee9;
+  --border-strong: #b8c4d4;
+  --text: #17202e;
+  --muted: #5a687b;
+  --faint: #6b7789;
+  --accent: #1f6feb;
+  --accent-strong: #0b5bd3;
+  --green: #1a7f37;
+  --green-soft: #e6f4ea;
+  --red: #cf222e;
+  --red-soft: #ffebe9;
+  --amber: #9a6700;
+  --amber-soft: #fff8c5;
+  --purple: #8250df;
+  --page-glow-accent: rgba(31, 111, 235, 0.07);
+  --page-glow-purple: rgba(130, 80, 223, 0.05);
+  --topbar-bg: rgba(246, 248, 251, 0.88);
+  --focus-ring: 0 0 0 3px rgba(31, 111, 235, 0.18);
+  --accent-soft: rgba(31, 111, 235, 0.1);
+  --primary-text: #ffffff;
+  --row-sheen: rgba(15, 23, 42, 0.018);
+  --selected-ring: 0 0 0 1px rgba(31, 111, 235, 0.45);
+  --review-flag-bg: rgba(31, 111, 235, 0.12);
+  --accent-border: rgba(31, 111, 235, 0.3);
+  --green-border: rgba(26, 127, 55, 0.35);
+  --red-border: rgba(207, 34, 46, 0.35);
+  --amber-border: rgba(154, 103, 0, 0.35);
+  --purple-border: rgba(130, 80, 223, 0.35);
+  --purple-soft: rgba(130, 80, 223, 0.1);
+  --empty-bg: rgba(255, 255, 255, 0.65);
+  --card-sheen: rgba(15, 23, 42, 0.015);
+  --card-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+  --backdrop: rgba(15, 23, 42, 0.35);
+  --modal-shadow: 0 30px 90px rgba(15, 23, 42, 0.2);
 }
 
 * {
@@ -36,8 +98,8 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(1100px 500px at 15% -10%, rgba(110, 168, 254, 0.08), transparent 60%),
-    radial-gradient(900px 480px at 100% 0%, rgba(188, 140, 255, 0.06), transparent 55%),
+    radial-gradient(1100px 500px at 15% -10%, var(--page-glow-accent), transparent 60%),
+    radial-gradient(900px 480px at 100% 0%, var(--page-glow-purple), transparent 55%),
     var(--bg);
   color: var(--text);
   font-family: var(--sans);
@@ -75,7 +137,7 @@ kbd {
   align-items: center;
   gap: 24px;
   padding: 12px 22px;
-  background: rgba(11, 14, 19, 0.88);
+  background: var(--topbar-bg);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(14px);
 }
@@ -204,7 +266,7 @@ kbd {
 input:focus,
 select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(110, 168, 254, 0.16);
+  box-shadow: var(--focus-ring);
 }
 
 .select,
@@ -236,7 +298,7 @@ select:focus {
 
 .chip.active {
   border-color: var(--accent);
-  background: rgba(110, 168, 254, 0.12);
+  background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
@@ -263,7 +325,7 @@ select:focus {
 .button.primary {
   border-color: var(--accent);
   background: var(--accent);
-  color: #08111f;
+  color: var(--primary-text);
   font-weight: 650;
 }
 
@@ -315,7 +377,7 @@ select:focus {
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent), var(--bg-raised);
+  background: linear-gradient(180deg, var(--row-sheen), transparent), var(--bg-raised);
   cursor: default;
   outline: none;
   transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
@@ -329,7 +391,7 @@ select:focus {
 .pr-row.selected,
 .pr-row:focus-visible {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(110, 168, 254, 0.35);
+  box-shadow: var(--selected-ring);
 }
 
 .pr-row.needs-review {
@@ -354,7 +416,7 @@ select:focus {
   margin-left: 4px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: rgba(110, 168, 254, 0.14);
+  background: var(--review-flag-bg);
   color: var(--accent-strong);
   font-family: var(--sans);
   font-size: 10.5px;
@@ -418,6 +480,10 @@ select:focus {
   opacity: 0.9;
 }
 
+:root[data-theme="light"] .label-chip {
+  filter: brightness(0.65) saturate(1.15);
+}
+
 .pr-status {
   display: flex;
   flex-wrap: wrap;
@@ -448,17 +514,17 @@ select:focus {
 }
 
 .check-success {
-  border-color: rgba(63, 185, 80, 0.4);
+  border-color: var(--green-border);
   color: var(--green);
 }
 
 .check-failure {
-  border-color: rgba(248, 81, 73, 0.45);
+  border-color: var(--red-border);
   color: var(--red);
 }
 
 .check-pending {
-  border-color: rgba(210, 153, 34, 0.45);
+  border-color: var(--amber-border);
   color: var(--amber);
 }
 
@@ -468,18 +534,18 @@ select:focus {
 }
 
 .approval {
-  border-color: rgba(63, 185, 80, 0.4);
+  border-color: var(--green-border);
   color: var(--green);
 }
 
 .changes {
-  border-color: rgba(248, 81, 73, 0.45);
+  border-color: var(--red-border);
   color: var(--red);
 }
 
 .fresh {
-  border-color: rgba(188, 140, 255, 0.45);
-  background: rgba(188, 140, 255, 0.12);
+  border-color: var(--purple-border);
+  background: var(--purple-soft);
   color: var(--purple);
   font-weight: 650;
 }
@@ -489,12 +555,12 @@ select:focus {
 }
 
 .conflict {
-  border-color: rgba(248, 81, 73, 0.45);
+  border-color: var(--red-border);
   color: var(--red);
 }
 
 .team {
-  border-color: rgba(110, 168, 254, 0.35);
+  border-color: var(--accent-border);
   color: var(--accent);
 }
 
@@ -524,12 +590,12 @@ select:focus {
 }
 
 .banner-error {
-  border-color: rgba(248, 81, 73, 0.45);
+  border-color: var(--red-border);
   background: var(--red-soft);
 }
 
 .banner-warn {
-  border-color: rgba(210, 153, 34, 0.4);
+  border-color: var(--amber-border);
   background: var(--amber-soft);
 }
 
@@ -587,7 +653,7 @@ select:focus {
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius);
   text-align: center;
-  background: rgba(17, 22, 30, 0.5);
+  background: var(--empty-bg);
 }
 
 .empty-icon {
@@ -628,10 +694,22 @@ kbd {
 
 /* Token setup */
 .setup-shell {
+  position: relative;
   display: grid;
   place-items: center;
   min-height: 100vh;
   padding: 32px 18px;
+}
+
+.setup-theme {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  z-index: 10;
+}
+
+.setup-theme .icon-button {
+  background: var(--bg-raised);
 }
 
 .setup-card {
@@ -639,8 +717,8 @@ kbd {
   padding: 30px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent), var(--bg-raised);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, var(--card-sheen), transparent), var(--bg-raised);
+  box-shadow: var(--card-shadow);
 }
 
 .eyebrow {
@@ -719,7 +797,7 @@ kbd {
   display: grid;
   place-items: start center;
   padding: 70px 18px;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--backdrop);
   backdrop-filter: blur(3px);
 }
 
@@ -728,7 +806,7 @@ kbd {
   border: 1px solid var(--border-strong);
   border-radius: 14px;
   background: var(--bg-raised);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--modal-shadow);
 }
 
 .modal-head {
@@ -770,6 +848,11 @@ kbd {
   .topbar {
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .setup-theme {
+    top: 14px;
+    right: 14px;
   }
 
   .brand {

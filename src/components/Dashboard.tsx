@@ -2,20 +2,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
 import { clearCache, pruneCache } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
-import { markSeen, clearLastSeen, lastSeenFor, loadSettings, saveSettings } from "../lib/settings";
+import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
 import { toSummary } from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
+import type { ResolvedTheme, ThemePreference } from "../lib/theme";
 import { PullRequestList } from "./PullRequestList";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
-  initial: Settings;
+  settings: Settings;
+  onChange: (settings: Settings) => void;
+  theme: ResolvedTheme;
+  onToggleTheme: () => void;
   onSignOut: () => void;
 }
 
-export function Dashboard({ initial, onSignOut }: Props) {
-  const [settings, setSettings] = useState(initial);
-  const [tab, setTab] = useState<Settings["defaultTab"]>(initial.defaultTab);
+export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut }: Props) {
+  const [tab, setTab] = useState<Settings["defaultTab"]>(settings.defaultTab);
   const [seenVersion, setSeenVersion] = useState(0);
   const [showSettings, setShowSettings] = useState(false);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
@@ -26,10 +30,6 @@ export function Dashboard({ initial, onSignOut }: Props) {
       return null;
     }
   })();
-
-  useEffect(() => {
-    saveSettings(settings);
-  }, [settings]);
 
   useEffect(() => {
     const update = (): void => setOnline(navigator.onLine);
@@ -99,9 +99,7 @@ export function Dashboard({ initial, onSignOut }: Props) {
 
   const saveToken = async (token: string): Promise<void> => {
     await resetLocalData();
-    const next = { ...settings, token };
-    setSettings(next);
-    saveSettings(next);
+    onChange({ ...settings, token });
     setShowSettings(false);
   };
 
@@ -165,6 +163,7 @@ export function Dashboard({ initial, onSignOut }: Props) {
               {rateLimit.remaining.toLocaleString()}/{rateLimit.limit.toLocaleString()}
             </span>
           ) : null}
+          <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           <button type="button" className="button tiny" onClick={refreshAll} data-testid="refresh-all">
             Refresh
           </button>
@@ -235,7 +234,8 @@ export function Dashboard({ initial, onSignOut }: Props) {
             <SettingsForm
               settings={settings}
               onSaveToken={(token) => void saveToken(token)}
-              onRefreshChange={(refreshSeconds) => setSettings({ ...settings, refreshSeconds })}
+              onRefreshChange={(refreshSeconds) => onChange({ ...settings, refreshSeconds })}
+              onThemeChange={(nextTheme) => onChange({ ...settings, theme: nextTheme })}
               onClearCache={() => void resetLocalData()}
               onSignOut={signOut}
             />
@@ -250,12 +250,14 @@ function SettingsForm({
   settings,
   onSaveToken,
   onRefreshChange,
+  onThemeChange,
   onClearCache,
   onSignOut,
 }: {
   settings: Settings;
   onSaveToken: (token: string) => void;
   onRefreshChange: (seconds: number) => void;
+  onThemeChange: (theme: ThemePreference) => void;
   onClearCache: () => void;
   onSignOut: () => void;
 }) {
@@ -288,6 +290,18 @@ function SettingsForm({
         <option value={120}>every 2 minutes</option>
         <option value={300}>every 5 minutes</option>
         <option value={900}>every 15 minutes</option>
+      </select>
+
+      <label htmlFor="theme">Theme</label>
+      <select
+        id="theme"
+        value={settings.theme}
+        onChange={(event) => onThemeChange(event.target.value as ThemePreference)}
+        data-testid="theme-select"
+      >
+        <option value="system">Match system</option>
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
       </select>
 
       <div className="settings-actions">

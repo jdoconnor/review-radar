@@ -22,6 +22,7 @@ Walking skeleton on `main`:
 - IndexedDB cache with ETag support, stale-while-revalidate and pruning
 - approval / changes-requested / CI / conflict / new-activity derivations
 - filters, sorting, keyboard navigation (`j`/`k`/`o`/`m`/`r`/`/`)
+- light and dark themes, defaulting to the system preference
 - error, rate-limit, offline, cached and empty states
 - unit + component tests, production build
 

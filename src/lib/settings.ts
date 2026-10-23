@@ -1,12 +1,16 @@
+import type { ThemePreference } from "./theme";
+
 export interface Settings {
   token: string;
   refreshSeconds: number;
   defaultTab: "review" | "mine";
+  theme: ThemePreference;
 }
 
 const TOKEN_KEY = "github-ui.token";
 const REFRESH_KEY = "github-ui.refresh-seconds";
 const TAB_KEY = "github-ui.default-tab";
+const THEME_KEY = "github-ui.theme";
 const LAST_SEEN_KEY = "github-ui.last-seen";
 
 function storage(): Storage | null {
@@ -44,10 +48,12 @@ function remove(key: string): void {
 export function loadSettings(): Settings {
   const refresh = Number(read(REFRESH_KEY));
   const tab = read(TAB_KEY);
+  const theme = read(THEME_KEY);
   return {
     token: read(TOKEN_KEY) ?? "",
     refreshSeconds: Number.isFinite(refresh) && refresh >= 15 ? refresh : 60,
     defaultTab: tab === "mine" ? "mine" : "review",
+    theme: theme === "light" || theme === "dark" ? theme : "system",
   };
 }
 
@@ -56,6 +62,7 @@ export function saveSettings(settings: Settings): void {
   else remove(TOKEN_KEY);
   write(REFRESH_KEY, String(settings.refreshSeconds));
   write(TAB_KEY, settings.defaultTab);
+  write(THEME_KEY, settings.theme);
 }
 
 export function clearToken(): void {
