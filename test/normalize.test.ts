@@ -64,6 +64,29 @@ describe("summarizeChecks", () => {
   it("returns unknown when there is no rollup", () => {
     expect(summarizeChecks(makePr({ commits: null })).state).toBe("unknown");
   });
+
+  it("uses the rollup state when individual contexts are forbidden", () => {
+    const summary = summarizeChecks(
+      makePr({
+        commits: {
+          nodes: [
+            {
+              commit: {
+                statusCheckRollup: {
+                  state: "FAILURE",
+                  contexts: { totalCount: 20, nodes: [null, null, null] },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    );
+    expect(summary.state).toBe("failure");
+    expect(summary.total).toBe(20);
+    expect(summary.failing).toBe(0);
+    expect(summary.pending).toBe(0);
+  });
 });
 
 describe("toSummary", () => {

@@ -63,8 +63,11 @@ Organization permission:
 | Members | Read-only | Resolves team review requests to team names. |
 
 If your organization uses SAML SSO, authorize the token for that organization.
-Without `Contents: Read-only`, token validation still succeeds, but the dashboard
-view fails with a permission error because the CI rollup reads the PR's commit.
+Without `Contents: Read-only`, token validation still succeeds, but the commit
+behind each PR's CI rollup is forbidden. Without `Checks: Read-only` and
+`Commit statuses: Read-only`, the rollup state can load but the individual
+contexts are forbidden. In either case the dashboard still renders every pull
+request and shows a **Limited data.** warning instead of dropping the view.
 
 For a classic token, use `repo` for private repositories (or `public_repo` for
 public-only) and `read:org` for team review requests. The app never writes, so

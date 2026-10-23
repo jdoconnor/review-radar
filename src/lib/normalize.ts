@@ -41,6 +41,7 @@ export function summarizeChecks(pr: PullRequestNode): CheckSummary {
   let failing = 0;
   let pending = 0;
   for (const context of contexts) {
+    if (!context) continue;
     const state = checkRunState(context);
     if (state === "failure") failing += 1;
     if (state === "pending") pending += 1;
