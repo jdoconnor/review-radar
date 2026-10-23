@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "github-ui",
+  // Set this to today's date.
+  "compatibility_date": "2026-10-22",
+  // The app is a static SPA. There is no Worker script and no server-side
+  // token exchange; Cloudflare only serves the Vite build.
+  "assets": {
+    "directory": "./dist/",
+    "not_found_handling": "single-page-application"
+  },
+  // `wrangler preview` requires a previews block. It is empty because the
+  // Worker has no preview-specific variables, secrets, or bindings.
+  "previews": {}
+}

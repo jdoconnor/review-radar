@@ -79,25 +79,33 @@ fine-grained read-only permissions are preferred.
 The token is stored in `localStorage` and sent only to
 `https://api.github.com/graphql`.
 
-## Deploy to Cloudflare Pages
+## Deploy to Cloudflare Workers
 
-The app is a static Vite build. Cloudflare Pages serves `dist/`; there are no
-Pages Functions, Workers, or proxies in this project, so the token never reaches
-Cloudflare.
+The app is a static Vite build served by Cloudflare Workers Static Assets. There
+is no Worker script, Pages Function, or proxy in this project, so the token
+never reaches Cloudflare.
 
-- Project name: `github-ui`
+- Worker name: `github-ui`
 - Production branch: `main`
 - Build command: `npm run check`
-- Build output: `dist`
+- Deploy command: `npx wrangler deploy`
+- Preview command: `npx wrangler preview`
+- Asset directory: `dist/`
 - Node version: 24
+- Wrangler config: `wrangler.jsonc`
 
-Cloudflare Pages watches `main` through its GitHub integration. It builds,
-deploys and creates preview deployments on its own; there is no GitHub Actions
-deploy or preview workflow. `npm run check` is the build command, so Cloudflare
-only publishes a green typecheck, test and build. `public/_headers` is copied to
-`dist/_headers` and sets the CSP, referrer policy, `nosniff`, permissions policy
-and COOP. The CSP allows network traffic only to `https://api.github.com`;
-GitHub Enterprise users must add their host to `connect-src` and `img-src`.
+Cloudflare Workers Builds watches `main` through its GitHub integration. It
+builds, deploys and creates preview deployments on its own; there is no GitHub
+Actions deploy or preview workflow. `npm run check` is the build command, so
+Cloudflare only publishes a green typecheck, test and build.
+
+`wrangler.jsonc` declares the Worker, its `dist/` assets, SPA fallback routing
+and an empty `previews` block. The block is required by `wrangler preview`; it is
+empty because this static Worker has no preview-specific variables, secrets or
+bindings. `public/_headers` is copied to `dist/_headers` and sets the CSP,
+referrer policy, `nosniff`, permissions policy and COOP. The CSP allows network
+traffic only to `https://api.github.com`; GitHub Enterprise users must add their
+host to `connect-src` and `img-src`.
 
 ## Caching model
 

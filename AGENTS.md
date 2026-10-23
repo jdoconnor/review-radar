@@ -109,12 +109,14 @@ npm run check      # typecheck + test + build — run before every push
 
 ## Deploy
 
-Static build to **Cloudflare Pages** (project `github-ui`, output `dist`).
-Cloudflare's GitHub integration watches `main` and owns build, deploy and preview;
-do not add a GitHub Actions deploy or preview workflow. Build command is
-`npm run check`, so only green builds publish. There are no Pages Functions,
-Workers, or proxies; the token never reaches Cloudflare. `public/_headers` sets
-the CSP and security headers. Do not add a server-side token exchange.
+Static build served by **Cloudflare Workers Static Assets** (Worker `github-ui`,
+asset directory `dist/`, config `wrangler.jsonc`). Cloudflare Workers Builds
+watches `main` and owns build, deploy and preview; do not add a GitHub Actions
+deploy or preview workflow. Build command is `npm run check`, deploy command is
+`npx wrangler deploy`, and preview command is `npx wrangler preview`, so only
+green builds publish. The Worker has no script, bindings or proxy; the token
+never reaches Cloudflare. `public/_headers` sets the CSP and security headers.
+Do not add a server-side token exchange.
 
 ## Architecture
 
@@ -126,7 +128,7 @@ src/
     PullRequestList.tsx    filters, sorting, keyboard navigation
     PullRequestRow.tsx     one PR
     TokenSetup.tsx         token entry + validation
-    Bits.tsx               pills, empty states, relative time
+    Bits.tsx               status icons, pills, empty states, relative time
   hooks/useCachedQuery.ts  cache-first fetch + stale-while-revalidate + polling
   lib/
     github.ts             GraphQL client, error taxonomy, conditional requests

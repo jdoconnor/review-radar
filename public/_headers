@@ -1,6 +1,6 @@
-# Cloudflare Pages headers. The app is static; these headers are the only
-# server-side policy, and they deliberately allow network traffic only to the
-# GitHub GraphQL API.
+# Cloudflare Workers static asset headers. The app is static; these headers are
+# the only server-side policy, and they deliberately allow network traffic only
+# to the GitHub GraphQL API.
 #
 # GitHub Enterprise users must add their host to connect-src and img-src.
 
