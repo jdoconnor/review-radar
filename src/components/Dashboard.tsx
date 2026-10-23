@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
@@ -8,6 +8,8 @@ import { toSummary } from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
+import { EMPTY_FILTERS, ListToolbar } from "./ListToolbar";
+import type { Filters, SortOrder } from "./ListToolbar";
 import { PullRequestList } from "./PullRequestList";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -25,6 +27,9 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [showSettings, setShowSettings] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<CacheStats | null>(null);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [sort, setSort] = useState<SortOrder>("default");
+  const searchRef = useRef<HTMLInputElement>(null);
   const wide = useMediaQuery("(min-width: 68.75em)");
   const sessionViewer = (() => {
     try {
@@ -86,6 +91,14 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     });
   }, [mineQuery.data, seenVersion, viewerLogin]);
 
+  const repos = useMemo(
+    () =>
+      [...new Set([...reviewItems, ...mineItems].map((item) => item.repo))].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    [reviewItems, mineItems],
+  );
+
   const onMarkSeen = useCallback((key: string) => {
     markSeen(key);
     setSeenVersion((value) => value + 1);
@@ -138,7 +151,9 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       active={wide ? tab === "review" : true}
       items={reviewItems}
       loading={reviewQuery.loading}
-      refreshing={reviewQuery.refreshing}
+      filters={filters}
+      sort={sort}
+      searchRef={searchRef}
       error={reviewQuery.error}
       warning={reviewQuery.warning}
       stale={reviewQuery.stale}
@@ -157,7 +172,9 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       active={wide ? tab === "mine" : true}
       items={mineItems}
       loading={mineQuery.loading}
-      refreshing={mineQuery.refreshing}
+      filters={filters}
+      sort={sort}
+      searchRef={searchRef}
       error={mineQuery.error}
       warning={mineQuery.warning}
       stale={mineQuery.stale}
@@ -244,6 +261,17 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       </header>
 
       <main className="content">
+        <ListToolbar
+          filters={filters}
+          onFiltersChange={setFilters}
+          sort={sort}
+          onSortChange={setSort}
+          repos={repos}
+          showQuickFilters={wide || tab === "mine"}
+          refreshing={reviewQuery.refreshing || mineQuery.refreshing}
+          onRefresh={refreshAll}
+          searchRef={searchRef}
+        />
         {wide ? (
           <div className="workspace">
             {reviewList}

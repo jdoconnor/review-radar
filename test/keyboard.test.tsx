@@ -142,7 +142,7 @@ describe("keyboard navigation", () => {
     stubFetch();
     await renderReviewQueue();
     const queue = screen.getByTestId("review-queue");
-    const search = within(queue).getByTestId("filter-text");
+    const search = screen.getByTestId("filter-text");
 
     await userEvent.click(search);
     await userEvent.type(search, "j");
@@ -161,7 +161,7 @@ describe("keyboard navigation", () => {
     expect(rows[0]?.dataset.selected).toBe("true");
 
     const queue = screen.getByTestId("review-queue");
-    await userEvent.click(within(queue).getByTestId("refresh"));
+    await userEvent.click(screen.getByTestId("refresh"));
 
     const afterRefresh = await within(queue).findAllByTestId("pr-row");
     expect(afterRefresh).toHaveLength(2);

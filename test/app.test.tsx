@@ -73,10 +73,14 @@ describe("App", () => {
 
     expect(await screen.findByText("Needs your review")).toBeInTheDocument();
     expect(screen.getByTestId("review-queue")).toBeInTheDocument();
+    expect(screen.getByTestId("list-toolbar")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New activity" })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId("tab-mine"));
     expect(await screen.findByText("My open pull request")).toBeInTheDocument();
     expect(screen.getByTestId("approval-pill")).toHaveTextContent("1 approval");
+    expect(screen.getByTestId("list-toolbar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New activity" })).toBeInTheDocument();
   });
 
   it("shows both queues side by side on a wide screen", async () => {
@@ -108,6 +112,88 @@ describe("App", () => {
     expect(screen.queryByTestId("tab-mine")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Needs my review" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "My pull requests" })).toBeInTheDocument();
+    expect(screen.getAllByTestId("list-toolbar")).toHaveLength(1);
+    expect(screen.getAllByTestId("filter-text")).toHaveLength(1);
+  });
+
+  it("filters both columns from the shared toolbar", async () => {
+    stubWideScreen();
+    const reviewAlpha = makePr({ id: "review-alpha", number: 50, title: "Review alpha" });
+    const reviewBeta = makePr({ id: "review-beta", number: 51, title: "Review beta" });
+    const mineAlpha = makePr({ id: "mine-alpha", number: 52, title: "Mine alpha" });
+    const mineBeta = makePr({ id: "mine-beta", number: 53, title: "Mine beta" });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { variables?: { search?: string } };
+        const search = String(body.variables?.search ?? "");
+        return search.includes("review-requested")
+          ? searchResponse([reviewAlpha, reviewBeta])
+          : searchResponse([mineAlpha, mineBeta]);
+      }),
+    );
+
+    render(<App />);
+
+    for (const title of ["Review alpha", "Review beta", "Mine alpha", "Mine beta"]) {
+      expect(await screen.findByText(title)).toBeInTheDocument();
+    }
+
+    await userEvent.type(screen.getByTestId("filter-text"), "alpha");
+
+    await waitFor(() => {
+      expect(screen.queryByText("Review beta")).not.toBeInTheDocument();
+      expect(screen.queryByText("Mine beta")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("Review alpha")).toBeInTheDocument();
+    expect(screen.getByText("Mine alpha")).toBeInTheDocument();
+  });
+
+  it("applies shared quick filters to both columns", async () => {
+    stubWideScreen();
+    const reviewChanges = makePr({
+      id: "review-changes",
+      number: 54,
+      title: "Review changes",
+      reviews: {
+        nodes: [
+          {
+            id: "R_changes",
+            state: "CHANGES_REQUESTED",
+            submittedAt: "2026-10-20T11:30:00.000Z",
+            author: { login: "alice" },
+          },
+        ],
+      },
+    });
+    const mineClean = makePr({ id: "mine-clean", number: 55, title: "Mine clean" });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { variables?: { search?: string } };
+        const search = String(body.variables?.search ?? "");
+        return search.includes("review-requested") ? searchResponse([reviewChanges]) : searchResponse([mineClean]);
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("Review changes")).toBeInTheDocument();
+    expect(await screen.findByText("Mine clean")).toBeInTheDocument();
+
+    const changes = screen.getByRole("button", { name: "Changes requested" });
+    expect(changes).toHaveAttribute("aria-pressed", "false");
+
+    await userEvent.click(changes);
+
+    expect(changes).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Review changes")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Mine clean")).not.toBeInTheDocument());
+
+    await userEvent.click(screen.getByTestId("clear-filters"));
+    expect(await screen.findByText("Mine clean")).toBeInTheDocument();
   });
 
   it("shows whether the viewer or someone else approved a pull request", async () => {
