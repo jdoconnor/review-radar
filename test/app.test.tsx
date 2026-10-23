@@ -24,6 +24,22 @@ function searchResponse(nodes: unknown[]): Response {
   });
 }
 
+function stubWideScreen(): void {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  );
+}
+
 beforeEach(async () => {
   await clearCache();
   sessionStorage.clear();
@@ -61,6 +77,37 @@ describe("App", () => {
     await userEvent.click(screen.getByTestId("tab-mine"));
     expect(await screen.findByText("My open pull request")).toBeInTheDocument();
     expect(screen.getByTestId("approval-pill")).toHaveTextContent("1 approval");
+  });
+
+  it("shows both queues side by side on a wide screen", async () => {
+    stubWideScreen();
+    const reviewPr = makePr({ id: "review", number: 42, title: "Needs your review" });
+    const minePr = makePr({
+      id: "mine",
+      number: 43,
+      title: "My open pull request",
+      url: "https://github.com/jdoconnor/github-ui/pull/43",
+    });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { variables?: { search?: string } };
+        const search = String(body.variables?.search ?? "");
+        return search.includes("review-requested") ? searchResponse([reviewPr]) : searchResponse([minePr]);
+      }),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("Needs your review")).toBeInTheDocument();
+    expect(await screen.findByText("My open pull request")).toBeInTheDocument();
+    expect(screen.getByTestId("review-queue")).toBeInTheDocument();
+    expect(screen.getByTestId("mine-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-review")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tab-mine")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Needs my review" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "My pull requests" })).toBeInTheDocument();
   });
 
   it("shows whether the viewer or someone else approved a pull request", async () => {

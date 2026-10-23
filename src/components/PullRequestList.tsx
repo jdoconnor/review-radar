@@ -7,6 +7,8 @@ import { PullRequestRow } from "./PullRequestRow";
 
 interface Props {
   kind: "review" | "mine";
+  heading?: string;
+  active: boolean;
   items: PullRequestSummary[];
   loading: boolean;
   refreshing: boolean;
@@ -15,6 +17,7 @@ interface Props {
   stale: boolean;
   fromCache: boolean;
   lastUpdated: number | null;
+  onActivate: () => void;
   onMarkSeen: (key: string) => void;
   onRefresh: () => void;
 }
@@ -37,6 +40,8 @@ const EMPTY_FILTERS: Filters = {
 
 export function PullRequestList({
   kind,
+  heading,
+  active,
   items,
   loading,
   refreshing,
@@ -44,6 +49,7 @@ export function PullRequestList({
   warning,
   stale,
   lastUpdated,
+  onActivate,
   onMarkSeen,
   onRefresh,
 }: Props) {
@@ -70,6 +76,7 @@ export function PullRequestList({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      if (!active) return;
       const target = event.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) {
@@ -102,7 +109,7 @@ export function PullRequestList({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [visible, selectedKey, onMarkSeen, onRefresh]);
+  }, [active, visible, selectedKey, onMarkSeen, onRefresh]);
 
   const hasFilters =
     filters.text !== "" ||
@@ -112,7 +119,20 @@ export function PullRequestList({
     filters.onlyNew;
 
   return (
-    <section className="list" data-testid={kind === "review" ? "review-queue" : "mine-view"}>
+    <section
+      className={`list ${active ? "active" : ""}`}
+      data-testid={kind === "review" ? "review-queue" : "mine-view"}
+      data-active={active ? "true" : "false"}
+      aria-label={heading ?? (kind === "review" ? "Review requests" : "My pull requests")}
+      onMouseDown={onActivate}
+      onFocusCapture={onActivate}
+    >
+      {heading ? (
+        <div className="list-head">
+          <h2>{heading}</h2>
+          <span className="count">{items.length}</span>
+        </div>
+      ) : null}
       <div className="list-toolbar">
         <input
           ref={searchRef}
