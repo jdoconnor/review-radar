@@ -11,6 +11,7 @@ interface Props {
   loading: boolean;
   refreshing: boolean;
   error: GithubError | null;
+  warning: string | null;
   stale: boolean;
   fromCache: boolean;
   lastUpdated: number | null;
@@ -40,6 +41,7 @@ export function PullRequestList({
   loading,
   refreshing,
   error,
+  warning,
   stale,
   lastUpdated,
   onMarkSeen,
@@ -190,18 +192,28 @@ export function PullRequestList({
 
       {error ? (
         <div
-          className={`banner ${error.kind === "auth" ? "banner-error" : "banner-warn"}`}
+          className={`banner ${error.kind === "auth" || error.kind === "forbidden" ? "banner-error" : "banner-warn"}`}
           role="status"
-          data-testid={error.kind === "auth" ? "auth-error" : error.kind === "rate-limit" ? "rate-limit" : "error"}
+          data-testid={
+            error.kind === "auth"
+              ? "auth-error"
+              : error.kind === "forbidden"
+                ? "permission-error"
+                : error.kind === "rate-limit"
+                  ? "rate-limit"
+                  : "error"
+          }
         >
           <strong>
             {error.kind === "auth"
               ? "Token problem."
-              : error.kind === "rate-limit"
-                ? "GitHub rate limit."
-                : error.kind === "network"
-                  ? "Offline."
-                  : "GitHub error."}
+              : error.kind === "forbidden"
+                ? "Token permissions."
+                : error.kind === "rate-limit"
+                  ? "GitHub rate limit."
+                  : error.kind === "network"
+                    ? "Offline."
+                    : "GitHub error."}
           </strong>{" "}
           {error.kind === "rate-limit" && error.resetAt
             ? `Resets at ${new Date(error.resetAt).toLocaleTimeString()}. `
@@ -210,6 +222,12 @@ export function PullRequestList({
           {stale && lastUpdated ? (
             <span className="banner-sub"> Showing cached results from {new Date(lastUpdated).toLocaleTimeString()}.</span>
           ) : null}
+        </div>
+      ) : null}
+
+      {warning && !error ? (
+        <div className="banner banner-warn" role="status" data-testid="permission-warning">
+          <strong>Limited data.</strong> {warning}
         </div>
       ) : null}
 

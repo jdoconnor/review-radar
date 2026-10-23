@@ -7,6 +7,7 @@ import type { RateLimit } from "../lib/types";
 export interface CachedQueryState<T> {
   data: T | null;
   error: GithubError | null;
+  warning: string | null;
   loading: boolean;
   refreshing: boolean;
   fromCache: boolean;
@@ -40,6 +41,7 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
   const key = cacheKey(query, variables);
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<GithubError | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [refreshing, setRefreshing] = useState(false);
   const [fromCache, setFromCache] = useState(false);
@@ -73,6 +75,7 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
         if (!mounted.current || generation.current !== current) return;
         setData(result.data);
         setRateLimit(result.rateLimit);
+        setWarning(result.warning);
         setFromCache(result.fromCache);
         setStale(result.stale);
         setLastUpdated(result.fetchedAt);
@@ -90,6 +93,7 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
             ? caught
             : new GithubError("network", caught instanceof Error ? caught.message : String(caught));
         setError(failure);
+        setWarning(null);
         failures.current += 1;
       } finally {
         if (mounted.current && generation.current === current) {
@@ -111,9 +115,10 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
     }
 
     let cancelled = false;
-    void readCache<{ data: T }>(key).then((cached) => {
+    void readCache<{ data: T; warning?: string | null }>(key).then((cached) => {
       if (cancelled || !cached) return;
       setData(cached.value.data);
+      setWarning(cached.value.warning ?? null);
       setFromCache(true);
       setLastUpdated(cached.fetchedAt);
       setLoading(false);
@@ -166,5 +171,5 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
     void run(true);
   }, [run]);
 
-  return { data, error, loading, refreshing, fromCache, stale, lastUpdated, rateLimit, refresh };
+  return { data, error, warning, loading, refreshing, fromCache, stale, lastUpdated, rateLimit, refresh };
 }

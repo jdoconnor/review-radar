@@ -30,7 +30,9 @@ export function TokenSetup({ onSave }: Props) {
         caught instanceof GithubError
           ? caught.kind === "auth"
             ? "GitHub rejected that token. A fine-grained token needs read access to the repositories you want to watch."
-            : caught.message
+            : caught.kind === "forbidden"
+              ? "That token is valid but is missing a permission. Check its repository access and the read-only permissions listed above."
+              : caught.message
           : "Could not validate the token. Check your connection and try again.";
       setError(message);
     } finally {
@@ -62,8 +64,9 @@ export function TokenSetup({ onSave }: Props) {
             aria-describedby="token-help"
           />
           <p id="token-help" className="hint">
-            Stored only in this browser. Use a fine-grained token with read access to the repos you
-            watch, or a classic token with <code>repo</code> and <code>read:org</code>.
+            Stored only in this browser. Fine-grained token: Pull requests, Issues, Contents, Checks,
+            Commit statuses and Metadata (read-only). Add Members (read-only) for team review
+            requests. Classic token: <code>repo</code> and <code>read:org</code>.
           </p>
           {error ? (
             <p className="error-text" role="alert" data-testid="setup-error">

@@ -1,7 +1,7 @@
 import { cacheKey, readCache, writeCache } from "./cache";
 import type { RateLimit } from "./types";
 
-export type GithubErrorKind = "auth" | "rate-limit" | "network" | "graphql" | "http";
+export type GithubErrorKind = "auth" | "forbidden" | "rate-limit" | "network" | "graphql" | "http";
 
 export class GithubError extends Error {
   readonly kind: GithubErrorKind;
@@ -20,11 +20,13 @@ export class GithubError extends Error {
 export interface GraphQLPayload<T> {
   data: T;
   rateLimit: RateLimit | null;
+  warning?: string | null;
 }
 
 export interface GraphQLResult<T> {
   data: T;
   rateLimit: RateLimit | null;
+  warning: string | null;
   fromCache: boolean;
   stale: boolean;
   fetchedAt: number;
@@ -63,15 +65,45 @@ function rateLimitFromHeaders(headers: Headers): RateLimit | null {
   };
 }
 
+interface GraphQLErrorShape {
+  message?: string;
+  type?: string;
+}
+
+function uniqueMessages(errors: GraphQLErrorShape[]): string {
+  return Array.from(
+    new Set(
+      errors
+        .map((error) => String(error.message ?? "").trim())
+        .filter(Boolean),
+    ),
+  ).join("; ");
+}
+
+function isForbiddenError(error: GraphQLErrorShape): boolean {
+  const message = String(error.message ?? "");
+  return (
+    error.type === "FORBIDDEN" ||
+    /not accessible by personal access token/i.test(message) ||
+    /insufficient scopes/i.test(message) ||
+    /resource not accessible/i.test(message)
+  );
+}
+
+function isRateLimitError(error: GraphQLErrorShape): boolean {
+  return /rate limit/i.test(String(error.message ?? ""));
+}
+
+const FORBIDDEN_HINT =
+  "Check the token's repository access and permissions; the CI rollup needs Contents, Checks and Commit statuses read access.";
+
 function messageFromBody(body: unknown, fallback: string): string {
   if (!body || typeof body !== "object") return fallback;
   const record = body as Record<string, unknown>;
   if (typeof record.message === "string" && record.message) return record.message;
   if (Array.isArray(record.errors)) {
-    const messages = record.errors
-      .map((error) => (error && typeof error === "object" ? String((error as { message?: unknown }).message ?? "") : ""))
-      .filter(Boolean);
-    if (messages.length > 0) return messages.join("; ");
+    const messages = uniqueMessages(record.errors as GraphQLErrorShape[]);
+    if (messages) return messages;
   }
   return fallback;
 }
@@ -110,6 +142,7 @@ export async function fetchGraphQL<T>(
       return {
         data: cached.value.data,
         rateLimit: cached.value.rateLimit,
+        warning: cached.value.warning ?? null,
         fromCache: true,
         stale: true,
         fetchedAt: cached.fetchedAt,
@@ -123,6 +156,7 @@ export async function fetchGraphQL<T>(
     return {
       data: cached.value.data,
       rateLimit: cached.value.rateLimit,
+      warning: cached.value.warning ?? null,
       fromCache: true,
       stale: false,
       fetchedAt: cached.fetchedAt,
@@ -145,27 +179,46 @@ export async function fetchGraphQL<T>(
     throw new GithubError("auth", "GitHub rejected the token. Check that it is valid and has repo access.", 401);
   }
   if (response.status === 403 || response.status === 429) {
-    const message = messageFromBody(body, "GitHub rate limit reached.");
-    throw new GithubError("rate-limit", message, response.status, rateLimit?.resetAt ?? null);
+    const message = messageFromBody(body, "GitHub returned 403 Forbidden.");
+    const exhausted =
+      rateLimit?.remaining === 0 ||
+      response.headers.get("x-ratelimit-remaining") === "0" ||
+      isRateLimitError({ message });
+    if (response.status === 429 || exhausted) {
+      throw new GithubError("rate-limit", message, response.status, rateLimit?.resetAt ?? null);
+    }
+    throw new GithubError("forbidden", `${message} ${FORBIDDEN_HINT}`, response.status);
   }
   if (!response.ok) {
     throw new GithubError("http", messageFromBody(body, `GitHub returned ${response.status}.`), response.status);
   }
 
-  const parsed = body as { data?: T; errors?: Array<{ message?: string }> } | null;
+  const parsed = body as { data?: T; errors?: GraphQLErrorShape[] } | null;
+  const errors = parsed?.errors ?? [];
+  const message = uniqueMessages(errors);
   if (!parsed?.data) {
-    const message = parsed?.errors?.map((error) => error.message).filter(Boolean).join("; ");
-    throw new GithubError("graphql", message || "GitHub returned an empty response.", response.status);
-  }
-  if (parsed.errors && parsed.errors.length > 0) {
-    const message = parsed.errors.map((error) => error.message).filter(Boolean).join("; ");
-    if (message) throw new GithubError("graphql", message, response.status);
+    throw new GithubError(
+      errors.some(isForbiddenError) ? "forbidden" : "graphql",
+      message || "GitHub returned an empty response.",
+      response.status,
+    );
   }
 
-  const payload: GraphQLPayload<T> = { data: parsed.data, rateLimit };
+  // GraphQL can return usable data alongside field-level errors. A fine-grained
+  // token without Contents read is the common case: every PR is present, but
+  // commits[0] is null and the CI rollup is unavailable. Keep the rows and warn
+  // instead of discarding the whole view.
+  const nonForbidden = errors.filter((error) => !isForbiddenError(error));
+  if (nonForbidden.length > 0) {
+    throw new GithubError("graphql", uniqueMessages(nonForbidden), response.status);
+  }
+  const warning =
+    errors.length > 0 ? `Some CI data could not be loaded. ${FORBIDDEN_HINT}` : null;
+
+  const payload: GraphQLPayload<T> = { data: parsed.data, rateLimit, warning };
   const etag = response.headers.get("etag");
   const fetchedAt = Date.now();
   await writeCache({ key, value: payload, etag, fetchedAt, lastUsedAt: fetchedAt });
 
-  return { ...payload, fromCache: false, stale: false, fetchedAt, etag };
+  return { ...payload, warning, fromCache: false, stale: false, fetchedAt, etag };
 }

@@ -40,9 +40,38 @@ npm run build      # production bundle
 npm run check      # typecheck + test + build
 ```
 
-Paste a fine-grained GitHub token with read access to the repositories you want
-to watch (or a classic token with `repo` and `read:org`). It is stored in
-`localStorage` and sent only to `https://api.github.com/graphql`.
+### Token scopes
+
+The dashboard is read-only. Use a fine-grained token scoped to the repositories
+you want to watch.
+
+Repository permissions:
+
+| Permission | Access | Why |
+| --- | --- | --- |
+| Metadata | Read-only | Mandatory for every fine-grained token. |
+| Pull requests | Read-only | PR search, reviews, review requests and mergeability. |
+| Issues | Read-only | PR labels and issue comments. |
+| Contents | Read-only | The commit behind each PR's CI rollup. |
+| Checks | Read-only | Check runs in the CI rollup. |
+| Commit statuses | Read-only | Legacy status contexts in the CI rollup. |
+
+Organization permission:
+
+| Permission | Access | Why |
+| --- | --- | --- |
+| Members | Read-only | Resolves team review requests to team names. |
+
+If your organization uses SAML SSO, authorize the token for that organization.
+Without `Contents: Read-only`, token validation still succeeds, but the dashboard
+view fails with a permission error because the CI rollup reads the PR's commit.
+
+For a classic token, use `repo` for private repositories (or `public_repo` for
+public-only) and `read:org` for team review requests. The app never writes, so
+fine-grained read-only permissions are preferred.
+
+The token is stored in `localStorage` and sent only to
+`https://api.github.com/graphql`.
 
 ## Deploy to Cloudflare Pages
 

@@ -104,6 +104,33 @@ describe("App", () => {
     expect(screen.getByTestId("review-queue")).toBeInTheDocument();
   });
 
+  it("keeps pull requests when the token cannot read their commits", async () => {
+    const pr = makePr({ commits: { nodes: [null] } });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          data: {
+            search: { nodes: [pr] },
+            rateLimit: { limit: 5000, remaining: 4999, resetAt: "2026-10-22T13:00:00Z", cost: 1 },
+          },
+          errors: [
+            { type: "FORBIDDEN", message: "Resource not accessible by personal access token" },
+            { type: "FORBIDDEN", message: "Resource not accessible by personal access token" },
+          ],
+        }),
+      ),
+    );
+
+    render(<App />);
+    expect(await screen.findByText("Add a review queue")).toBeInTheDocument();
+    const warning = await screen.findByTestId("permission-warning");
+    expect(warning).toHaveTextContent("Limited data");
+    expect(warning).toHaveTextContent("Contents, Checks and Commit statuses");
+    expect(screen.queryByTestId("permission-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("review-queue")).toBeInTheDocument();
+  });
+
   it("keeps cached rows visible when the network fails", async () => {
     let fail = false;
     vi.stubGlobal(

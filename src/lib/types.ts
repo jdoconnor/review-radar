@@ -77,7 +77,7 @@ export interface PullRequestNode {
           contexts: { totalCount: number; nodes: CheckContextNode[] } | null;
         } | null;
       };
-    }>;
+    } | null>;
   } | null;
 }
 

@@ -188,6 +188,7 @@ export function Dashboard({ initial, onSignOut }: Props) {
             loading={reviewQuery.loading}
             refreshing={reviewQuery.refreshing}
             error={reviewQuery.error}
+            warning={reviewQuery.warning}
             stale={reviewQuery.stale}
             fromCache={reviewQuery.fromCache}
             lastUpdated={reviewQuery.lastUpdated}
@@ -201,6 +202,7 @@ export function Dashboard({ initial, onSignOut }: Props) {
             loading={mineQuery.loading}
             refreshing={mineQuery.refreshing}
             error={mineQuery.error}
+            warning={mineQuery.warning}
             stale={mineQuery.stale}
             fromCache={mineQuery.fromCache}
             lastUpdated={mineQuery.lastUpdated}
