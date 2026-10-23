@@ -23,6 +23,7 @@ interface Options {
   query: string;
   variables: Record<string, unknown>;
   refreshSeconds: number;
+  active?: boolean;
 }
 
 const MIN_REFRESH_MS = 15_000;
@@ -37,7 +38,7 @@ const MAX_BACKOFF_MS = 5 * 60_000;
  * 4. Back off on errors, and stop polling entirely while rate-limited.
  */
 export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
-  const { enabled, token, query, variables, refreshSeconds } = options;
+  const { enabled, token, query, variables, refreshSeconds, active } = options;
   const key = cacheKey(query, variables);
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<GithubError | null>(null);
@@ -133,10 +134,10 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
     };
     // Re-run only when the identity of the query changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, token, key]);
+  }, [enabled, token, key, active]);
 
   useEffect(() => {
-    if (!enabled || !token) return;
+    if (!enabled || !token || !active) return;
     const schedule = (): void => {
       if (timer.current) clearTimeout(timer.current);
       if (typeof document !== "undefined" && document.hidden) return;
@@ -164,7 +165,7 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
     };
     // Rate limit changes should reschedule the next poll.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, token, key, refreshSeconds, rateLimit?.remaining, rateLimit?.resetAt]);
+  }, [enabled, token, key, refreshSeconds, rateLimit?.remaining, rateLimit?.resetAt, active]);
 
   const refresh = useCallback(() => {
     failures.current = 0;
