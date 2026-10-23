@@ -87,17 +87,19 @@ never reaches Cloudflare.
 
 - Worker name: `github-ui`
 - Production branch: `main`
-- Build command: `npm run check`
+- Build command: leave empty
 - Deploy command: `npx wrangler deploy`
-- Preview command: `npx wrangler preview`
+- Non-production deploy command: `npx wrangler preview`
 - Asset directory: `dist/`
 - Node version: 24
 - Wrangler config: `wrangler.jsonc`
 
 Cloudflare Workers Builds watches `main` through its GitHub integration. It
 builds, deploys and creates preview deployments on its own; there is no GitHub
-Actions deploy or preview workflow. `npm run check` is the build command, so
-Cloudflare only publishes a green typecheck, test and build.
+Actions deploy or preview workflow. `wrangler.jsonc` runs `npm run check` as a
+custom build before every upload, so the deploy always has a fresh `dist/` and
+only publishes a green typecheck, test and build. Leave the dashboard build
+command empty; setting it to `npm run check` as well runs the checks twice.
 
 `wrangler.jsonc` declares the Worker, its `dist/` assets, SPA fallback routing
 and an empty `previews` block. The block is required by `wrangler preview`; it is

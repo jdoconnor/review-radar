@@ -3,6 +3,12 @@
   "name": "github-ui",
   // Set this to today's date.
   "compatibility_date": "2026-10-22",
+  // Build the Vite bundle before Wrangler uploads assets. Workers Builds may
+  // run the deploy command without a separate build step, and Wrangler fails
+  // if the assets directory does not exist yet.
+  "build": {
+    "command": "npm run check"
+  },
   // The app is a static SPA. There is no Worker script and no server-side
   // token exchange; Cloudflare only serves the Vite build.
   "assets": {
