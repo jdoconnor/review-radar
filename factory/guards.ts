@@ -22,6 +22,10 @@ export async function changedFiles(cwd: string): Promise<string[]> {
     let path = line.slice(3).trim();
     if (path.includes(" -> ")) path = path.split(" -> ").pop() ?? path;
     path = path.replace(/^"|"$/g, "");
+    // The factory symlinks the primary checkout's dependencies into the
+    // worktree. That link is setup, not agent work; never let it count as a
+    // change or reach a commit.
+    if (path === "node_modules" || path.startsWith("node_modules/")) continue;
     files.push(path);
   }
   return files;

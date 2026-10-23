@@ -58,8 +58,11 @@ export async function removeWorktree(path: string, force = false): Promise<void>
 export async function commitAll(worktree: Worktree, message: string, body: string): Promise<boolean> {
   const add = await run("git", ["add", "-A"], { cwd: worktree.path });
   if (add.code !== 0) return false;
-  const status = await run("git", ["status", "--porcelain"], { cwd: worktree.path });
-  if (!status.stdout.trim()) return false;
+  // Defensive: even if an older worktree still tracks the dependency symlink,
+  // never stage it. Only real source changes belong in a factory commit.
+  await run("git", ["reset", "-q", "--", "node_modules"], { cwd: worktree.path });
+  const staged = await run("git", ["diff", "--cached", "--name-only"], { cwd: worktree.path });
+  if (staged.code !== 0 || !staged.stdout.trim()) return false;
   const commit = await run("git", ["commit", "-m", message, "-m", body], { cwd: worktree.path });
   return commit.code === 0;
 }
