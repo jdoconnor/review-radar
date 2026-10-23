@@ -139,6 +139,13 @@ test/                      unit + component tests
 factory/                   issue-driven build loop
 ```
 
+## Design guidelines
+
+All UI changes must follow [`DESIGN.md`](DESIGN.md). In short: size with
+`rem`/`em` (not `px`, except hairlines and shadows), keep every control
+keyboard-reachable with a visible focus ring, meet AA contrast in both themes,
+support 200% zoom and reflow, and honor reduced motion.
+
 ## Rules this codebase follows
 
 1. **Cache first, network second.** A screen with cached data must render before
