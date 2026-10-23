@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { GithubError, fetchGraphQL } from "../lib/github";
 import { VIEWER_QUERY } from "../lib/queries";
+import type { ResolvedTheme } from "../lib/theme";
 import type { ViewerPayload } from "../lib/types";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface Props {
   onSave: (token: string) => void;
+  theme: ResolvedTheme;
+  onToggleTheme: () => void;
 }
 
-export function TokenSetup({ onSave }: Props) {
+export function TokenSetup({ onSave, theme, onToggleTheme }: Props) {
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -42,6 +46,9 @@ export function TokenSetup({ onSave }: Props) {
 
   return (
     <main className="setup-shell">
+      <div className="setup-theme">
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
       <section className="setup-card" aria-labelledby="setup-title">
         <p className="eyebrow">Review Radar</p>
         <h1 id="setup-title">Your review desk, cached locally.</h1>

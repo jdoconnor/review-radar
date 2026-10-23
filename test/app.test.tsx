@@ -150,4 +150,61 @@ describe("App", () => {
     expect(await screen.findByText("Add a review queue")).toBeInTheDocument();
     expect(await screen.findByTestId("cache-indicator")).toBeInTheDocument();
   });
+
+  it("switches between dark and light themes and remembers the choice", async () => {
+    localStorage.setItem("github-ui.theme", "dark");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => searchResponse([makePr()])),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId("review-queue")).toBeInTheDocument();
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("dark"));
+
+    const toggle = screen.getByTestId("theme-toggle");
+    expect(toggle).toHaveAccessibleName("Switch to light theme");
+
+    await userEvent.click(toggle);
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(localStorage.getItem("github-ui.theme")).toBe("light");
+    expect(toggle).toHaveAccessibleName("Switch to dark theme");
+  });
+
+  it("offers an explicit theme choice in settings", async () => {
+    localStorage.setItem("github-ui.theme", "dark");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => searchResponse([makePr()])),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByTestId("review-queue")).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("open-settings"));
+
+    const select = screen.getByLabelText("Theme");
+    expect(select).toHaveValue("dark");
+
+    await userEvent.selectOptions(select, "light");
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(localStorage.getItem("github-ui.theme")).toBe("light");
+  });
+
+  it("themes the token setup screen and toggles before sign-in", async () => {
+    localStorage.removeItem("github-ui.token");
+    localStorage.setItem("github-ui.theme", "dark");
+
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: /review desk/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId("theme-toggle"));
+
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(localStorage.getItem("github-ui.theme")).toBe("light");
+  });
 });
