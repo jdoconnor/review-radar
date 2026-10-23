@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { RefObject } from "react";
 import type { GithubError } from "../lib/github";
 import { filterSummaries, sortForAttention } from "../lib/normalize";
 import type { PullRequestSummary } from "../lib/types";
 import { EmptyState, Spinner } from "./Bits";
+import { hasActiveFilters } from "./ListToolbar";
+import type { Filters, SortOrder } from "./ListToolbar";
 import { PullRequestRow } from "./PullRequestRow";
 
 interface Props {
@@ -11,7 +14,9 @@ interface Props {
   active: boolean;
   items: PullRequestSummary[];
   loading: boolean;
-  refreshing: boolean;
+  filters: Filters;
+  sort: SortOrder;
+  searchRef: RefObject<HTMLInputElement | null>;
   error: GithubError | null;
   warning: string | null;
   stale: boolean;
@@ -22,29 +27,15 @@ interface Props {
   onRefresh: () => void;
 }
 
-interface Filters {
-  text: string;
-  repo: string;
-  onlyFailing: boolean;
-  onlyChanges: boolean;
-  onlyNew: boolean;
-}
-
-const EMPTY_FILTERS: Filters = {
-  text: "",
-  repo: "",
-  onlyFailing: false,
-  onlyChanges: false,
-  onlyNew: false,
-};
-
 export function PullRequestList({
   kind,
   heading,
   active,
   items,
   loading,
-  refreshing,
+  filters,
+  sort,
+  searchRef,
   error,
   warning,
   stale,
@@ -53,22 +44,24 @@ export function PullRequestList({
   onMarkSeen,
   onRefresh,
 }: Props) {
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [sort, setSort] = useState<"attention" | "oldest" | "newest">(kind === "review" ? "oldest" : "attention");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
-  const repos = useMemo(
-    () => [...new Set(items.map((item) => item.repo))].sort((left, right) => left.localeCompare(right)),
-    [items],
+  const effectiveFilters = useMemo(
+    () => (kind === "review" ? { ...filters, onlyNew: false } : filters),
+    [filters, kind],
   );
+  const effectiveSort = sort === "default" ? (kind === "review" ? "oldest" : "attention") : sort;
 
   const visible = useMemo(() => {
-    const filtered = filterSummaries(items, filters);
-    if (sort === "oldest") return [...filtered].sort((l, r) => Date.parse(l.createdAt) - Date.parse(r.createdAt));
-    if (sort === "newest") return [...filtered].sort((l, r) => Date.parse(r.updatedAt) - Date.parse(l.updatedAt));
+    const filtered = filterSummaries(items, effectiveFilters);
+    if (effectiveSort === "oldest") {
+      return [...filtered].sort((l, r) => Date.parse(l.createdAt) - Date.parse(r.createdAt));
+    }
+    if (effectiveSort === "newest") {
+      return [...filtered].sort((l, r) => Date.parse(r.updatedAt) - Date.parse(l.updatedAt));
+    }
     return sortForAttention(filtered);
-  }, [items, filters, sort]);
+  }, [items, effectiveFilters, effectiveSort]);
 
   useEffect(() => {
     if (selectedKey && !visible.some((item) => item.key === selectedKey)) setSelectedKey(null);
@@ -109,14 +102,9 @@ export function PullRequestList({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [active, visible, selectedKey, onMarkSeen, onRefresh]);
+  }, [active, visible, selectedKey, onMarkSeen, onRefresh, searchRef]);
 
-  const hasFilters =
-    filters.text !== "" ||
-    filters.repo !== "" ||
-    filters.onlyFailing ||
-    filters.onlyChanges ||
-    filters.onlyNew;
+  const hasFilters = hasActiveFilters(effectiveFilters);
 
   return (
     <section
@@ -133,83 +121,6 @@ export function PullRequestList({
           <span className="count">{items.length}</span>
         </div>
       ) : null}
-      <div className="list-toolbar">
-        <input
-          ref={searchRef}
-          className="search"
-          type="search"
-          placeholder={kind === "review" ? "Filter review requests…" : "Filter your pull requests…"}
-          value={filters.text}
-          onChange={(event) => setFilters({ ...filters, text: event.target.value })}
-          aria-label="Filter pull requests"
-          data-testid="filter-text"
-        />
-        <select
-          className="select"
-          value={filters.repo}
-          onChange={(event) => setFilters({ ...filters, repo: event.target.value })}
-          aria-label="Filter by repository"
-          data-testid="filter-repo"
-        >
-          <option value="">All repositories</option>
-          {repos.map((repo) => (
-            <option key={repo} value={repo}>
-              {repo}
-            </option>
-          ))}
-        </select>
-        <select
-          className="select"
-          value={sort}
-          onChange={(event) => setSort(event.target.value as typeof sort)}
-          aria-label="Sort pull requests"
-          data-testid="sort"
-        >
-          <option value="oldest">Oldest first</option>
-          <option value="newest">Recently updated</option>
-          <option value="attention">Needs attention</option>
-        </select>
-        {kind === "mine" ? (
-          <div className="chips" role="group" aria-label="Quick filters">
-            <button
-              type="button"
-              className={`chip ${filters.onlyNew ? "active" : ""}`}
-              onClick={() => setFilters({ ...filters, onlyNew: !filters.onlyNew })}
-            >
-              New activity
-            </button>
-            <button
-              type="button"
-              className={`chip ${filters.onlyFailing ? "active" : ""}`}
-              onClick={() => setFilters({ ...filters, onlyFailing: !filters.onlyFailing })}
-            >
-              Failing CI
-            </button>
-            <button
-              type="button"
-              className={`chip ${filters.onlyChanges ? "active" : ""}`}
-              onClick={() => setFilters({ ...filters, onlyChanges: !filters.onlyChanges })}
-            >
-              Changes requested
-            </button>
-          </div>
-        ) : null}
-        {hasFilters ? (
-          <button type="button" className="button tiny ghost" onClick={() => setFilters(EMPTY_FILTERS)}>
-            Clear
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="button tiny ghost refresh"
-          onClick={onRefresh}
-          disabled={refreshing}
-          data-testid="refresh"
-        >
-          {refreshing ? "Refreshing…" : "Refresh"}
-        </button>
-      </div>
-
       {error ? (
         <div
           className={`banner ${error.kind === "auth" || error.kind === "forbidden" ? "banner-error" : "banner-warn"}`}
