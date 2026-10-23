@@ -8,8 +8,5 @@
   "assets": {
     "directory": "./dist/",
     "not_found_handling": "single-page-application"
-  },
-  // `wrangler preview` requires a previews block. It is empty because the
-  // Worker has no preview-specific variables, secrets, or bindings.
-  "previews": {}
+  }
 }
