@@ -1,0 +1,47 @@
+name: Spec
+description: A complete brief for the issue-driven factory. The body is the frozen prompt.
+title: "[spec] "
+labels: ["factory:spec"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write the outcome, not the implementation. This body is handed to a coding agent verbatim.
+        Add `factory:ready` when it is concrete enough to build. Add `[bug]` to the title for a bug spec.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What can a reviewer do after this ships? One or two sentences.
+      placeholder: "A reviewer can filter the review queue to one repository and keep that filter across reloads."
+    validations:
+      required: true
+  - type: textarea
+    id: requirements
+    attributes:
+      label: Requirements
+      description: Concrete, testable behaviour. A requirement with no observable consequence is not a requirement.
+      placeholder: |
+        - The repository filter lists only repos present in the current queue.
+        - The selected repo is persisted in localStorage and restored on load.
+        - Clearing the filter restores all rows.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Files to touch or avoid, edge cases, accessibility, performance.
+      value: |
+        - Follow AGENTS.md.
+        - `npm run check` must pass.
+        - No new runtime dependencies unless this issue explains why.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else the agent should know. Do not paste holdout scenarios here.
+    validations:
+      required: false

@@ -1,0 +1,31 @@
+name: Holdout wall
+
+# A factory branch must never edit the factory, its acceptance config, or the
+# workflows that enforce the wall. This is the mechanical backstop to the
+# prompt and to factory/guards.ts.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  wall:
+    if: startsWith(github.head_ref, 'factory/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject protected paths
+        run: |
+          git fetch --depth=1 origin "${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          BAD=$(printf '%s\n' "$CHANGED" | grep -E '^(factory/|\.github/|vitest\.holdout\.config\.ts$|test/setup\.ts$)|\.heldout\.(ts|tsx)$' || true)
+          if [ -n "$BAD" ]; then
+            echo "::error::Factory PR modifies protected paths:"
+            printf '%s\n' "$BAD"
+            exit 1
+          fi
+          echo "Wall intact."
