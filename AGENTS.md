@@ -83,6 +83,10 @@ Do not begin by editing the primary checkout.
 One worktree per task, on a task branch before the first commit. Remove it when
 the work merges or is abandoned.
 
+When `FACTORY_AGENT=1`, the factory has already created the task worktree and
+started you inside it. Do not create another worktree, branch or commit; work
+only in the current directory. The factory commits, pushes and opens the PR.
+
 ## Finish work in a pull request
 
 A branch is not done. When `npm run check` is green:

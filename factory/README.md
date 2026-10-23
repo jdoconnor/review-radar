@@ -113,9 +113,12 @@ import { expect, it } from "vitest";
 ## Worktrees and cleanup
 
 Each run gets `.factory/worktrees/issue-<n>` on `factory/issue-<n>-<slug>`
-(gitignored). `node_modules` is symlinked from the primary checkout unless the
-agent edits a lockfile, in which case the worktree installs its own. Failed
-worktrees are kept; successful ones are removed when `worktrees.cleanup` is true.
+(gitignored). The agent is started inside that worktree and must not create
+another worktree or commit; the factory owns the commit, push and PR.
+`node_modules` is symlinked from the primary checkout unless the agent edits a
+lockfile, in which case the worktree installs its own. The symlink is ignored and
+never committed. Failed worktrees are kept; successful ones are removed when
+`worktrees.cleanup` is true.
 
 ## Metrics
 

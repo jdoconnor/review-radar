@@ -105,6 +105,7 @@ export function renderPrompt(spec: Spec, config: FactoryConfig, feedback?: strin
     "the issue explicitly requires one.",
     "",
     "## How to work",
+    "- You are already inside the factory's task worktree. Do not create another worktree, branch, or commit. Work only in the current directory; the factory commits, pushes and opens the PR.",
     "- Keep the change focused on the issue. Do not refactor unrelated code.",
     "- Add or update tests for every behaviour change.",
     "- Use `data-testid` hooks for user-visible states that acceptance tests may assert.",
@@ -116,6 +117,7 @@ export function renderPrompt(spec: Spec, config: FactoryConfig, feedback?: strin
     `- GitHub issues labeled \`${config.labels.holdout}\` are holdout acceptance scenarios. Do not list, read, search, or infer their contents. Do not use \`gh\` at all; the token available to you is intentionally invalid.`,
     "- Do not modify `factory/`, `.github/`, `vitest.holdout.config.ts`, or `test/setup.ts`.",
     "- Do not add or edit files whose names end in `.heldout.ts` or `.heldout.tsx`.",
+    "- Do not run `git worktree`, `git switch`, `git checkout -b`, or `git commit`. Stay in the directory the factory gave you.",
   ];
 
   if (feedback?.trim()) {
