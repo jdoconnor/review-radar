@@ -1,4 +1,4 @@
-# AGENTS.md — github-ui
+# AGENTS.md — review-radar
 
 Entry point for humans and agents. This repo is a **client-side GitHub review
 dashboard**, and its work queue is **GitHub issues**, not Markdown spec files.
@@ -109,7 +109,7 @@ npm run check      # typecheck + test + build — run before every push
 
 ## Deploy
 
-Static build served by **Cloudflare Workers Static Assets** (Worker `github-ui`,
+Static build served by **Cloudflare Workers Static Assets** (Worker `review-radar`,
 asset directory `dist/`, config `wrangler.jsonc`). Cloudflare Workers Builds
 watches `main` and owns build, deploy and preview; do not add a GitHub Actions
 deploy or preview workflow. The Worker's deploy command is `npx wrangler deploy`

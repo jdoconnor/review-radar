@@ -19,7 +19,7 @@ describe("theme", () => {
   });
 
   it("ignores an unknown stored theme", () => {
-    localStorage.setItem("github-ui.theme", "sepia");
+    localStorage.setItem("review-radar.theme", "sepia");
 
     expect(loadSettings().theme).toBe("system");
   });

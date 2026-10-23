@@ -7,11 +7,11 @@ export interface Settings {
   theme: ThemePreference;
 }
 
-const TOKEN_KEY = "github-ui.token";
-const REFRESH_KEY = "github-ui.refresh-seconds";
-const TAB_KEY = "github-ui.default-tab";
-const THEME_KEY = "github-ui.theme";
-const LAST_SEEN_KEY = "github-ui.last-seen";
+const TOKEN_KEY = "review-radar.token";
+const REFRESH_KEY = "review-radar.refresh-seconds";
+const TAB_KEY = "review-radar.default-tab";
+const THEME_KEY = "review-radar.theme";
+const LAST_SEEN_KEY = "review-radar.last-seen";
 
 function storage(): Storage | null {
   try {

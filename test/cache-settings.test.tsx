@@ -27,7 +27,7 @@ beforeEach(async () => {
   fake.reset();
   vi.stubGlobal("indexedDB", fake.factory);
   await clearCache();
-  localStorage.setItem("github-ui.token", TOKEN);
+  localStorage.setItem("review-radar.token", TOKEN);
   stubFetch();
 });
 
@@ -50,7 +50,7 @@ describe("cache settings", () => {
   });
 
   it("clears the cache without signing out or losing last-seen marks", async () => {
-    localStorage.setItem("github-ui.last-seen", JSON.stringify({ "jdoconnor/github-ui#42": 123 }));
+    localStorage.setItem("review-radar.last-seen", JSON.stringify({ "jdoconnor/review-radar#42": 123 }));
     await writeCache({ key: "seeded", value: 1, etag: null, fetchedAt: 1, lastUsedAt: 1 });
 
     render(<App />);
@@ -59,9 +59,9 @@ describe("cache settings", () => {
     await userEvent.click(screen.getByTestId("clear-cache"));
 
     await waitFor(() => expect(screen.getByTestId("cache-stats")).toHaveTextContent("0 cached responses"));
-    expect(localStorage.getItem("github-ui.token")).toBe(TOKEN);
-    expect(localStorage.getItem("github-ui.last-seen")).toBe(
-      JSON.stringify({ "jdoconnor/github-ui#42": 123 }),
+    expect(localStorage.getItem("review-radar.token")).toBe(TOKEN);
+    expect(localStorage.getItem("review-radar.last-seen")).toBe(
+      JSON.stringify({ "jdoconnor/review-radar#42": 123 }),
     );
     expect(await readCache("seeded")).toBeNull();
     expect(screen.getByTestId("review-queue")).toBeInTheDocument();

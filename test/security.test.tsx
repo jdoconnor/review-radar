@@ -76,12 +76,12 @@ function stubFetch(): ReturnType<typeof vi.fn> {
 }
 
 function expectTokenAbsentEverywhere(token: string): void {
-  expect(localStorage.getItem("github-ui.token")).toBe(token);
+  expect(localStorage.getItem("review-radar.token")).toBe(token);
 
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index) ?? "";
     const value = localStorage.getItem(key) ?? "";
-    if (key === "github-ui.token") continue;
+    if (key === "review-radar.token") continue;
     expect(value).not.toContain(token);
     expect(key).not.toContain(token);
   }
@@ -189,7 +189,7 @@ describe("token handling", () => {
 
   it("shows settings copy that matches what the app can promise", async () => {
     stubFetch();
-    localStorage.setItem("github-ui.token", TOKEN);
+    localStorage.setItem("review-radar.token", TOKEN);
 
     render(<App />);
     await screen.findByTestId("review-queue");
@@ -203,10 +203,10 @@ describe("token handling", () => {
 
   it("signing out clears the token, cached responses and last-seen marks", async () => {
     stubFetch();
-    localStorage.setItem("github-ui.token", TOKEN);
+    localStorage.setItem("review-radar.token", TOKEN);
     localStorage.setItem(
-      "github-ui.last-seen",
-      JSON.stringify({ "jdoconnor/github-ui#42": Date.parse("2026-10-20T09:00:00Z") }),
+      "review-radar.last-seen",
+      JSON.stringify({ "jdoconnor/review-radar#42": Date.parse("2026-10-20T09:00:00Z") }),
     );
     await writeCache({
       key: "cached-review-queue",
@@ -222,8 +222,8 @@ describe("token handling", () => {
     await userEvent.click(screen.getByTestId("open-settings"));
     await userEvent.click(screen.getByTestId("sign-out"));
 
-    await waitFor(() => expect(localStorage.getItem("github-ui.token")).toBeNull());
-    expect(localStorage.getItem("github-ui.last-seen")).toBeNull();
+    await waitFor(() => expect(localStorage.getItem("review-radar.token")).toBeNull());
+    expect(localStorage.getItem("review-radar.last-seen")).toBeNull();
     expect(await readCache("cached-review-queue")).toBeNull();
     expect(await screen.findByRole("heading", { name: /review desk/i })).toBeInTheDocument();
     expect(consoleMessages.join("\n")).not.toContain(TOKEN);
@@ -231,8 +231,8 @@ describe("token handling", () => {
 
   it("replacing the token clears cached responses and last-seen marks", async () => {
     stubFetch();
-    localStorage.setItem("github-ui.token", TOKEN);
-    localStorage.setItem("github-ui.last-seen", JSON.stringify({ "jdoconnor/github-ui#42": 1 }));
+    localStorage.setItem("review-radar.token", TOKEN);
+    localStorage.setItem("review-radar.last-seen", JSON.stringify({ "jdoconnor/review-radar#42": 1 }));
     await writeCache({
       key: "cached-review-queue",
       value: { data: { search: { nodes: [] } }, rateLimit: null },
@@ -247,8 +247,8 @@ describe("token handling", () => {
     await userEvent.type(screen.getByLabelText("Replace token"), REPLACEMENT);
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(localStorage.getItem("github-ui.token")).toBe(REPLACEMENT));
-    expect(localStorage.getItem("github-ui.last-seen")).toBeNull();
+    await waitFor(() => expect(localStorage.getItem("review-radar.token")).toBe(REPLACEMENT));
+    expect(localStorage.getItem("review-radar.last-seen")).toBeNull();
     expect(await readCache("cached-review-queue")).toBeNull();
     for (let index = 0; index < sessionStorage.length; index += 1) {
       expect(sessionStorage.getItem(sessionStorage.key(index) ?? "") ?? "").not.toContain(TOKEN);

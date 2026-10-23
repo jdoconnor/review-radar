@@ -76,7 +76,7 @@ describe("pruning", () => {
     fake.store.set("stale", { key: "stale", value: 1, lastUsedAt: now - 15 * DAY });
     const cache = await freshCache();
     expect(await cache.pruneCacheIfDue(now)).toBe(1);
-    expect(localStorage.getItem("github-ui.cache-pruned-at")).toBe(String(now));
+    expect(localStorage.getItem("review-radar.cache-pruned-at")).toBe(String(now));
 
     fake.store.set("stale-again", { key: "stale-again", value: 2, lastUsedAt: now - 15 * DAY });
     expect(await cache.pruneCacheIfDue(now + 5 * HOUR)).toBe(0);
@@ -159,7 +159,7 @@ describe("quota", () => {
 });
 
 describe("cross-tab invalidation", () => {
-  it("announces writes and clears on the github-ui.cache channel", async () => {
+  it("announces writes and clears on the review-radar.cache channel", async () => {
     const fake = installFakeIndexedDb();
     vi.stubGlobal("indexedDB", fake.factory);
     const { instances } = installBroadcastChannel();
@@ -169,7 +169,7 @@ describe("cross-tab invalidation", () => {
 
     const channel = instances[0];
     expect(channel).toBeDefined();
-    expect(channel?.name).toBe("github-ui.cache");
+    expect(channel?.name).toBe("review-radar.cache");
     expect(channel?.posted).toEqual([{ type: "write", key: "one" }]);
 
     await cache.clearCache();

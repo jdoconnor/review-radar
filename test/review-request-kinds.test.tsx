@@ -19,7 +19,7 @@ const TEAM = makePr({
   id: "team",
   number: 62,
   title: "Team review request",
-  url: "https://github.com/jdoconnor/github-ui/pull/62",
+  url: "https://github.com/jdoconnor/review-radar/pull/62",
   reviewRequests: {
     totalCount: 1,
     nodes: [{ requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } }],
@@ -30,7 +30,7 @@ const BOTH = makePr({
   id: "both",
   number: 63,
   title: "Direct and team request",
-  url: "https://github.com/jdoconnor/github-ui/pull/63",
+  url: "https://github.com/jdoconnor/review-radar/pull/63",
   reviewRequests: {
     totalCount: 2,
     nodes: [
@@ -44,7 +44,7 @@ const NEITHER = makePr({
   id: "neither",
   number: 64,
   title: "Review requested from someone else",
-  url: "https://github.com/jdoconnor/github-ui/pull/64",
+  url: "https://github.com/jdoconnor/review-radar/pull/64",
   reviewRequests: {
     totalCount: 1,
     nodes: [{ requestedReviewer: { __typename: "User", login: "other-reviewer" } }],
@@ -81,7 +81,7 @@ beforeEach(async () => {
   await clearCache();
   sessionStorage.clear();
   localStorage.clear();
-  localStorage.setItem("github-ui.token", "test-token");
+  localStorage.setItem("review-radar.token", "test-token");
   stubFetch();
 });
 

@@ -4,7 +4,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
-import { toSummary } from "../lib/normalize";
+import { toSummary, relativeTime } from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
@@ -27,29 +27,30 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [showSettings, setShowSettings] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<CacheStats | null>(null);
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
+  const [documentHidden, setDocumentHidden] = useState(typeof document === "undefined" ? true : document.hidden);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortOrder>("default");
   const searchRef = useRef<HTMLInputElement>(null);
   const wide = useMediaQuery("(min-width: 68.75em)");
   const sessionViewer = (() => {
     try {
-      return sessionStorage.getItem("github-ui.viewer");
+      return sessionStorage.getItem("review-radar.viewer");
     } catch {
       return null;
     }
   })();
 
   useEffect(() => {
-    const update = (): void => setOnline(navigator.onLine);
-    window.addEventListener("online", update);
-    window.addEventListener("offline", update);
-    // Prune stale responses on startup, but at most once every six hours.
-    void pruneCacheIfDue();
+    const update = (): void => setDocumentHidden(document.hidden);
+    document.addEventListener("visibilitychange", update);
     return () => {
-      window.removeEventListener("online", update);
-      window.removeEventListener("offline", update);
+      document.removeEventListener("visibilitychange", update);
     };
   }, []);
+
+  useEffect(() => {
+    setDocumentHidden(document.hidden);
+  }, [document.hidden]);
 
   const reviewQuery = useCachedQuery<SearchPayload>({
     enabled: true,
@@ -57,6 +58,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     query: queryFor("review"),
     variables: variablesFor("review"),
     refreshSeconds: settings.refreshSeconds,
+    active: tab === "review",
   });
 
   const mineQuery = useCachedQuery<SearchPayload>({
@@ -65,6 +67,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     query: queryFor("mine"),
     variables: variablesFor("mine"),
     refreshSeconds: settings.refreshSeconds,
+    active: tab === "mine",
   });
 
   const viewerLogin =
@@ -109,9 +112,12 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     mineQuery.refresh();
   }, [reviewQuery, mineQuery]);
 
-  const active = tab === "review" ? reviewQuery : mineQuery;
-  const rateLimit = active.rateLimit;
+  const activeQuery = tab === "review" ? reviewQuery : mineQuery;
+  const inactiveQuery = tab === "review" ? mineQuery : reviewQuery;
+  const rateLimit = activeQuery.rateLimit;
   const resetAt = rateLimit?.resetAt ? new Date(rateLimit.resetAt) : null;
+  const activeLastUpdated = activeQuery.lastUpdated;
+  const activeFromCache = activeQuery.fromCache;
 
   // A token change is a user change. Never let the next person on this browser
   // inherit the previous person's cached pull requests or last-seen marks.
@@ -188,6 +194,12 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     />
   );
 
+  // Compute the "updated <relative time>" label for the active view
+  const updatedLabel = useMemo(() => {
+    if (!activeLastUpdated) return null;
+    return `updated ${relativeTime(activeLastUpdated.toString())}`;
+  }, [activeLastUpdated]);
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -197,7 +209,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
           </span>
           <div>
             <strong>Review Radar</strong>
-            <span className="brand-sub">{viewerLogin ? `@${viewerLogin}` : "github-ui"}</span>
+            <span className="brand-sub">{viewerLogin ? `@${viewerLogin}` : "review-radar"}</span>
           </div>
         </div>
 
@@ -232,7 +244,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
               Offline
             </span>
           ) : null}
-          {active.fromCache ? (
+          {activeFromCache ? (
             <span className="pill cached" data-testid="cache-indicator" title="Rendered from the local cache">
               Cached
             </span>
@@ -246,6 +258,18 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
               {rateLimit.remaining.toLocaleString()}/{rateLimit.limit.toLocaleString()}
             </span>
           ) : null}
+          {/* Show "updated <relative time>" for active view */}
+          {updatedLabel && (
+            <span className="pill" data-testid="updated-indicator" title="Data last updated">
+              {updatedLabel}
+            </span>
+          )}
+          {/* Show pill while document hidden */}
+          {documentHidden && (
+            <span className="pill hidden" data-testid="hidden-pill" title="Document hidden">
+              Hidden
+            </span>
+          )}
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           <button type="button" className="button tiny" onClick={refreshAll} data-testid="refresh-all">
             Refresh
