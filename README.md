@@ -122,20 +122,23 @@ host to `connect-src` and `img-src`.
 
 ## The factory
 
-Specs and acceptance scenarios are GitHub issues. The factory turns a ready spec
-into a worktree, a coding-agent run, `npm run check`, a holdout evaluation, and a
-PR that closes the issue.
+Specs are GitHub issues. Acceptance tests are files in `holdouts/`. The factory
+turns a ready spec into a worktree, a coding-agent run, `npm run check`, a
+holdout evaluation, and a PR that closes the issue.
 
 ```bash
 npm run factory -- doctor
 npm run factory -- list
 npm run factory -- run --issue 8
 npm run factory -- eval
+npm run factory -- holdout
 ```
 
-The coding agent never sees the holdout issues: it runs with invalid GitHub
-credentials, and the evaluator reads the scenarios in a separate process. The
-full design is in [`factory/README.md`](factory/README.md).
+Holdout files are named `*.heldout.ts(x)`; a `p0-`, `p1-` or `p2-` prefix sets
+the priority. The evaluator copies each test into `test/`, runs it after the
+agent exits, and deletes the copy. The agent is instructed not to read
+`holdouts/`, and the guards reject a PR that modifies it. The full design is in
+[`factory/README.md`](factory/README.md).
 
 ## Security model: the token never leaves the browser
 
@@ -160,7 +163,7 @@ can read it. We ship no third-party scripts and keep the dependency surface
 small. Treat the token like a password and scope it to read-only repository
 access.
 
-The factory's GitHub token (used by `gh` to read spec and holdout issues during
+The factory's GitHub token (used by `gh` to read spec issues during
 development/CI) is a build-time credential. It is not part of the deployed app
 and is never sent to the browser.
 

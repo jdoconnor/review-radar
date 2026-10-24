@@ -42,6 +42,6 @@ body:
     id: notes
     attributes:
       label: Notes
-      description: Anything else the agent should know. Do not paste holdout scenarios here.
+      description: Holdout acceptance tests live in `holdouts/`; do not paste them here.
     validations:
       required: false

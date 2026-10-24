@@ -4,7 +4,7 @@ import type { FactoryConfig } from "./config";
 import { factoryPath, repoRoot } from "./config";
 import { run } from "./exec";
 
-const PROTECTED_PREFIXES = ["factory/", ".github/", ".factory/"];
+const PROTECTED_PREFIXES = ["factory/", ".github/", ".factory/", "holdouts/"];
 const PROTECTED_FILES = new Set(["vitest.holdout.config.ts", "test/setup.ts", "AGENTS.md"]);
 
 export function assertNoStop(): void {

@@ -3,10 +3,12 @@
   "labels": {
     "spec": "factory:spec",
     "ready": "factory:ready",
-    "holdout": "factory:holdout",
     "blocked": "factory:blocked",
     "automerge": "factory:automerge",
     "manual": "factory:manual"
+  },
+  "holdouts": {
+    "dir": "holdouts"
   },
   "codingAgent": {
     "adapter": "opencode",

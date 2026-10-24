@@ -4,7 +4,7 @@ import { loadConfig, repoRoot, type FactoryConfig } from "./config";
 import { evaluateHoldout, formatReport } from "./evaluate";
 import { run } from "./exec";
 import * as github from "./gh";
-import { loadScenariosFromCode, loadScenariosFromGithub } from "./holdout";
+import { loadScenarios } from "./holdout";
 import { runSpec, writeRunReport, type RunOptions } from "./orchestrator";
 import { loadSpec, loadSpecIssues, renderPrompt } from "./spec";
 
@@ -28,7 +28,6 @@ function repoConfig(): FactoryConfig {
 const LABELS: Array<{ name: keyof FactoryConfig["labels"]; color: string; description: string }> = [
   { name: "spec", color: "6ea8fe", description: "A factory spec. The issue body is the frozen prompt." },
   { name: "ready", color: "3fb950", description: "Ready for the factory to pick up." },
-  { name: "holdout", color: "bc8cff", description: "Holdout acceptance scenario. The coding agent must never read this." },
   { name: "blocked", color: "f85149", description: "The factory stopped on this issue and needs a human." },
   { name: "automerge", color: "d29922", description: "Marks a factory PR that may be auto-merged when green." },
   { name: "manual", color: "8d9aae", description: "Needs a human decision before continuing." },
@@ -42,7 +41,7 @@ async function doctor(config: FactoryConfig): Promise<void> {
   const repo = ghOk ? await github.repoView(root, config.repo) : null;
   const user = authOk ? await github.currentUser(root) : null;
   const specs = ghOk ? await loadSpecIssues(root, config, { readyOnly: false }) : [];
-  const scenarios = await loadScenariosFromCode(root, config);
+  const scenarios = await loadScenarios(root, config);
   const branch = await run("git", ["branch", "--show-current"], { cwd: root });
   const status = await run("git", ["status", "--porcelain"], { cwd: root });
   const packageJson = existsSync(join(root, "package.json"))
@@ -58,7 +57,7 @@ async function doctor(config: FactoryConfig): Promise<void> {
     existsSync(join(root, "vitest.holdout.config.ts")),
     "vitest.holdout.config.ts",
   ]);
-  checks.push(["holdout scenarios", scenarios.length > 0, `${scenarios.length} issue(s) labeled ${config.labels.holdout}`]);
+  checks.push(["holdout scenarios", scenarios.length > 0, `${scenarios.length} in ${config.holdouts.dir}/`]);
   checks.push(["specs", true, `${specs.length} issue(s) labeled ${config.labels.spec}`]);
   checks.push(["branch", branch.stdout.trim() === config.worktrees.base, branch.stdout.trim() || "(detached)"]);
   checks.push(["clean tree", status.stdout.trim() === "", status.stdout.trim() ? "dirty" : "clean"]);
@@ -137,9 +136,9 @@ async function runCommand(config: FactoryConfig): Promise<void> {
 
 async function evalCommand(config: FactoryConfig): Promise<void> {
   const worktree = option("--worktree") ?? repoRoot();
-  const scenarios = await loadScenariosFromCode(worktree, config);
+  const scenarios = await loadScenarios(worktree, config);
   if (scenarios.length === 0) {
-    console.error(`No holdout scenarios found. Add issues labeled ${config.labels.holdout}.`);
+    console.error(`No holdout scenarios found in ${config.holdouts.dir}/.`);
     process.exitCode = 1;
     return;
   }
@@ -151,25 +150,20 @@ async function evalCommand(config: FactoryConfig): Promise<void> {
   console.log(formatReport(report));
   if (!report.gatePassed) {
     for (const result of report.results.filter((item) => !item.passed)) {
-      console.log(`\n── #${result.number} ${result.title} ──\n${result.detail.slice(-4_000)}`);
+      console.log(`\n── ${result.title} ──\n${result.detail.slice(-4_000)}`);
     }
     process.exitCode = 1;
   }
 }
 
 async function holdout(config: FactoryConfig): Promise<void> {
-  try {
-    const scenarios = await loadScenariosFromCode(repoRoot(), config);
-    console.log("DEBUG: loadScenariosFromCode returned", scenarios.length, "scenarios");
-    if (scenarios.length === 0) {
-      console.log(`No holdout scenarios. Add issues labeled ${config.labels.holdout}.`);
-      return;
-    }
-    for (const scenario of scenarios) {
-      console.log(`#${scenario.number} [${scenario.priority}] ${scenario.title} (${scenario.kind}) file=${scenario.file}`);
-    }
-  } catch (e) {
-    console.error("Error in holdout:", e);
+  const scenarios = await loadScenarios(repoRoot(), config);
+  if (scenarios.length === 0) {
+    console.log(`No holdout scenarios in ${config.holdouts.dir}/.`);
+    return;
+  }
+  for (const scenario of scenarios) {
+    console.log(`[${scenario.priority}] ${scenario.title}`);
   }
 }
 
@@ -187,13 +181,15 @@ Usage:
   npm run factory -- run --no-github     Local branch only; no push or PR
   npm run factory -- eval                Run the holdout gate against the current tree
   npm run factory -- eval --worktree P   Run the holdout gate against a worktree
-  npm run factory -- holdout             List holdout scenario issues
+  npm run factory -- holdout             List holdout scenario files
 
 The work queue is GitHub issues:
   ${"factory:spec"}     the spec (the issue body is the frozen prompt)
   ${"factory:ready"}    the go signal
-  ${"factory:holdout"}  acceptance scenario; never shown to the coding agent
   ${"factory:blocked"}  needs a human
+
+Holdout acceptance tests are files in holdouts/ named
+*.heldout.ts or *.heldout.tsx. Prefix a file with p0-, p1- or p2- to set its priority.
 `);
 }
 
