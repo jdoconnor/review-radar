@@ -1,8 +1,8 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// Holdout configuration. The evaluator writes scenario tests into test/ and
-// removes them after the run. Never checked in by an agent.
+// Holdout configuration. The evaluator copies a test from holdouts/ into test/
+// and removes it after the run. The committed source is never in test/.
 export default defineConfig({
   plugins: [react()],
   test: {

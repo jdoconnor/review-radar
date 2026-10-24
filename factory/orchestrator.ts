@@ -7,7 +7,7 @@ import { evaluateHoldout, formatReport, type EvalReport } from "./evaluate";
 import { run } from "./exec";
 import * as github from "./gh";
 import { assertNoStop, assertWall, changedFiles } from "./guards";
-import { loadScenariosFromCode } from "./holdout";
+import { loadScenarios } from "./holdout";
 import { renderPrompt, type Spec } from "./spec";
 import { commitAll, createWorktree, removeWorktree, type Worktree } from "./worktrees";
 
@@ -105,7 +105,12 @@ async function buildWithAgent(
   return { ok: false, attempts: maxAttempts, feedback, agentOutput };
 }
 
-function prBody(spec: Spec, report: EvalReport | null, agentOutput: string): string {
+function prBody(
+  spec: Spec,
+  report: EvalReport | null,
+  agentOutput: string,
+  config: FactoryConfig,
+): string {
   const summary = agentOutput.trim().slice(-3_500) || "Implemented by the coding agent.";
   const gate = report
     ? `${report.passed}/${report.total} holdout scenarios passed (${Math.round(report.passRate * 100)}%)`
@@ -127,8 +132,8 @@ function prBody(spec: Spec, report: EvalReport | null, agentOutput: string): str
     "- `npm run check` passed before the branch was pushed.",
     `- ${gate}.`,
     "",
-    "_Built by the issue-driven factory. The holdout scenarios live in issues labeled",
-    "`factory:holdout` and are never shown to the coding agent._",
+    "_Built by the issue-driven factory. The holdout scenarios live in",
+    `\`${config.holdouts?.dir || "holdouts"}/\`, outside the coding agent's writable paths._`,
   ].join("\n");
 }
 
@@ -168,7 +173,7 @@ export async function runSpec(
 
   if (options.dryRun) {
     const prompt = renderPrompt(spec, config);
-    const scenarios = await loadScenariosFromCode(repoRoot(), config);
+    const scenarios = await loadScenarios(repoRoot(), config);
     console.log("── prompt ─────────────────────────────────────────────");
     console.log(prompt);
     console.log("───────────────────────────────────────────────────────");
@@ -239,7 +244,7 @@ export async function runSpec(
     return outcome;
   }
 
-  const scenarios = await loadScenariosFromCode(repoRoot(), config);
+  const scenarios = await loadScenarios(repoRoot(), config);
   const report = await evaluateHoldout(worktree.path, scenarios, {
     runs: config.eval.runs,
     quorum: config.eval.passQuorum,
@@ -280,7 +285,7 @@ export async function runSpec(
     return outcome;
   }
 
-  const body = prBody(spec, report, build.agentOutput);
+  const body = prBody(spec, report, build.agentOutput, config);
   let pr = await github.createPullRequest(repoRoot(), {
     title: `spec #${spec.number}: ${spec.title}`,
     body,

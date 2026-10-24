@@ -20,35 +20,42 @@ the network answers.
 ## The issue-driven factory
 
 The build loop is adapted from the dark-factory pattern in
-`../fuckcarrentalcompanies`. The important change: **the work lives in GitHub
-issues**.
+`../fuckcarrentalcompanies`. Specs live in GitHub issues; acceptance tests live
+on disk in `holdouts/`.
 
 | Store | What lives there |
 | --- | --- |
 | Issue labeled `factory:spec` | The spec. The issue body is the frozen prompt. |
 | Issue labeled `factory:ready` | The go signal. No ready spec means the queue is empty. |
-| Issue labeled `factory:holdout` | An acceptance scenario the coding agent must never read. |
+| `holdouts/*.heldout.ts(x)` | An acceptance test the coding agent must not read or edit. |
 | Issue labeled `factory:blocked` | The factory stopped; a human needs to look. |
 | PR labeled `factory:automerge` | A green factory PR that may be squash-merged. |
 
-There is no `specs/` directory and no `scenarios/` directory. If you find
-yourself writing a Markdown file to describe work, stop and file an issue.
+There is no `specs/` directory. If you find yourself writing a Markdown file to
+describe work, stop and file an issue. Acceptance tests are the only work
+artifact kept on disk.
 
 ### The wall
 
 The coding agent and the grader are isolated:
 
-1. The agent is told not to read `factory:holdout` issues.
+1. The agent is told not to read `holdouts/`.
 2. The agent runs with `GH_TOKEN`/`GITHUB_TOKEN` set to an invalid value and a
-   throwaway `GH_CONFIG_DIR`, so `gh` cannot list the private holdout issues.
+   throwaway `GH_CONFIG_DIR`, so `gh` cannot reach GitHub.
 3. `factory/guards.ts` rejects any diff touching `factory/`, `.github/`,
-   `vitest.holdout.config.ts`, `test/setup.ts`, or `*.heldout.tsx`.
+   `holdouts/`, `vitest.holdout.config.ts`, `test/setup.ts`, or
+   `*.heldout.ts(x)`.
 4. `.github/workflows/holdout-wall.yml` rejects a `factory/*` PR that touches
    those paths.
 
-The evaluator runs after the agent exits, with the real credentials. It writes
-each holdout test into `test/`, runs it once, and deletes it. A failed holdout
-gate labels the PR; it never feeds scenario text back into a retry.
+The evaluator loads each test from `holdouts/` in the primary checkout, not from
+the agent's worktree, writes it into `test/`, runs it once, and deletes it. A
+failed holdout gate labels the PR; it never feeds scenario text back into a
+retry.
+
+`holdouts/` is committed, so this is a guardrail, not a sandbox: an agent that
+ignores its prompt could read the files. Keep holdout details out of spec issues
+and treat the agent as untrusted.
 
 ### Run the factory
 
@@ -62,13 +69,14 @@ npm run factory -- run                 # every ready spec
 npm run factory -- run --dry-run       # render, touch nothing
 npm run factory -- run --no-github     # local branch, no push/PR
 npm run factory -- eval                # holdout gate against current tree
-npm run factory -- holdout             # list scenario issues
+npm run factory -- holdout             # list holdout files
 ```
 
 A run: creates a worktree on `factory/issue-<n>-<slug>`, runs the coding agent,
-runs `npm run check`, commits, evaluates the holdout gate, pushes, opens a PR
-with `Closes #n`, and merges when the gate is green and auto-merge is enabled.
-Failed worktrees are kept under `.factory/worktrees/` for inspection.
+runs `npm run check`, commits, evaluates the holdout gate from `holdouts/`,
+pushes, opens a PR with `Closes #n`, and merges when the gate is green and
+auto-merge is enabled. Failed worktrees are kept under `.factory/worktrees/` for
+inspection.
 
 Emergency stop: `touch .factory/STOP` halts every run; delete it to resume.
 
@@ -140,6 +148,7 @@ src/
     settings.ts           token, refresh interval, last-seen map
     types.ts              shared shapes
 test/                      unit + component tests
+holdouts/                  acceptance tests, read only by the evaluator
 factory/                   issue-driven build loop
 ```
 
@@ -177,12 +186,14 @@ support 200% zoom and reflow, and honor reduced motion.
 
 - Feature/bug spec: open an issue with the **Spec** template, add
   `factory:spec`; add `factory:ready` when it is concrete enough to build.
-- Acceptance scenario: open an issue with the **Holdout scenario** template and
-  add `factory:holdout`. It must contain a `## Machine` block.
+- Acceptance scenario: add `holdouts/<name>.heldout.ts(x)`. Prefix `p0-`, `p1-`
+  or `p2-` to set the priority (default `P1`). Import app code from `../src/`
+  and prefer stable `data-testid` hooks.
 - Bug report: use `[bug]` in the title (or the `type:bug` label) so the factory
   writes a bug prompt.
 
-Do not paste a holdout scenario into a spec issue. That breaks the wall.
+Do not paste a holdout scenario into a spec issue. Specs are prompts the agent
+reads; holdouts are graders it must not.
 
 ## Not included
 

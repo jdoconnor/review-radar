@@ -7,10 +7,12 @@ export interface FactoryConfig {
   labels: {
     spec: string;
     ready: string;
-    holdout: string;
     blocked: string;
     automerge: string;
     manual: string;
+  };
+  holdouts: {
+    dir: string;
   };
   codingAgent: {
     adapter: string;

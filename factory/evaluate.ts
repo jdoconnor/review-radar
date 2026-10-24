@@ -2,11 +2,10 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { FactoryConfig } from "./config";
 import { factoryPath } from "./config";
-import { run, runShell } from "./exec";
+import { run } from "./exec";
 import type { Scenario } from "./holdout";
 
 export interface ScenarioResult {
-  number: number;
   title: string;
   priority: Scenario["priority"];
   runs: number;
@@ -39,39 +38,32 @@ async function runVitest(
   scenario: Scenario,
   timeoutMs: number,
 ): Promise<{ ok: boolean; output: string }> {
-  if (!scenario.file || !scenario.code) return { ok: false, output: "scenario has no test file/code" };
-
-  const target = join(worktree, scenario.file);
-  const fileExists = existsSync(target);
-  console.log("DEBUG runVitest: target exists before read =", fileExists);
-  
-  if (!fileExists) {
-    return { ok: false, output: `holdout test file not found: ${target}` };
+  if (!scenario.code.trim()) {
+    return { ok: false, output: `holdout test is empty: ${scenario.file}` };
   }
 
-  // Read the code from the permanent file
-  const fs = await import("node:fs");
-  const fileCode = fs.readFileSync(target, "utf8").trim();
-  const fileExistsAfterRead = existsSync(target);
-  console.log("DEBUG runVitest: target exists after read =", fileExistsAfterRead);
-  
-  if (!fileExistsAfterRead) {
-    return { ok: false, output: `holdout test file disappeared after read: ${target}` };
+  // The grader is copied into the worktree at run time and removed afterwards.
+  // The source file in holdouts/ is never mutated.
+  const tempTarget = join(worktree, scenario.testFile);
+  if (existsSync(tempTarget)) {
+    return { ok: false, output: `refusing to overwrite existing ${scenario.testFile}` };
   }
 
-  if (!fileCode) {
-    return { ok: false, output: `holdout test file is empty: ${target}` };
-  }
-
-  // Write the code to a temp location for vitest to avoid conflicting with permanent file
-  const tempTarget = join(worktree, "test", scenario.file.replace(/^test\//, ""));
   mkdirSync(dirname(tempTarget), { recursive: true });
-  writeFileSync(tempTarget, fileCode, "utf8");
+  writeFileSync(tempTarget, scenario.code, "utf8");
 
   try {
     const result = await run(
       "npx",
-      ["--no-install", "vitest", "run", "--config", "vitest.holdout.config.ts", `test/${scenario.file.replace(/^test\//, "")}`, "--reporter=dot"],
+      [
+        "--no-install",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.holdout.config.ts",
+        scenario.testFile,
+        "--reporter=dot",
+      ],
       { cwd: worktree, timeoutMs },
     );
     return {
@@ -79,24 +71,8 @@ async function runVitest(
       output: `${result.stdout}\n${result.stderr}`.trim(),
     };
   } finally {
-    // Clean up the temp file, but leave the permanent .heldout.tsx file intact
-    if (existsSync(tempTarget)) {
-      rmSync(tempTarget, { force: true, recursive: true });
-    }
+    rmSync(tempTarget, { force: true });
   }
-}
-
-async function runCommand(
-  worktree: string,
-  scenario: Scenario,
-  timeoutMs: number,
-): Promise<{ ok: boolean; output: string }> {
-  if (!scenario.command) return { ok: false, output: "scenario has no command" };
-  const result = await runShell(scenario.command, { cwd: worktree, timeoutMs });
-  return {
-    ok: result.code === 0 && !result.timedOut,
-    output: `${result.stdout}\n${result.stderr}`.trim(),
-  };
 }
 
 export async function evaluateHoldout(
@@ -111,16 +87,12 @@ export async function evaluateHoldout(
     const details: string[] = [];
     let passes = 0;
     for (let attempt = 1; attempt <= options.runs; attempt += 1) {
-      const result =
-        scenario.kind === "vitest"
-          ? await runVitest(worktree, scenario, timeoutMs)
-          : await runCommand(worktree, scenario, timeoutMs);
+      const result = await runVitest(worktree, scenario, timeoutMs);
       if (result.ok) passes += 1;
       else details.push(`run ${attempt}: ${result.output.slice(-2_500)}`);
     }
     const passed = passes >= options.quorum;
     results.push({
-      number: scenario.number,
       title: scenario.title,
       priority: scenario.priority,
       runs: options.runs,
@@ -167,7 +139,7 @@ export function formatReport(report: EvalReport): string {
   ];
   for (const result of report.results) {
     lines.push(
-      `  ${result.passed ? "✓" : "✗"} #${result.number} [${result.priority}] ${result.title} (${result.passes}/${result.runs})`,
+      `  ${result.passed ? "✓" : "✗"} [${result.priority}] ${result.title} (${result.passes}/${result.runs})`,
     );
   }
   return lines.join("\n");

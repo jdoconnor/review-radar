@@ -1,6 +1,6 @@
 name: Holdout wall
 
-# A factory branch must never edit the factory, its acceptance config, or the
+# A factory branch must never edit the factory, its acceptance tests, or the
 # workflows that enforce the wall. This is the mechanical backstop to the
 # prompt and to factory/guards.ts.
 
@@ -22,7 +22,7 @@ jobs:
         run: |
           git fetch --depth=1 origin "${{ github.base_ref }}"
           CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          BAD=$(printf '%s\n' "$CHANGED" | grep -E '^(factory/|\.github/|vitest\.holdout\.config\.ts$|test/setup\.ts$)|\.heldout\.(ts|tsx)$' || true)
+          BAD=$(printf '%s\n' "$CHANGED" | grep -E '^(factory/|\.github/|holdouts/|vitest\.holdout\.config\.ts$|test/setup\.ts$)|\.heldout\.(ts|tsx)$' || true)
           if [ -n "$BAD" ]; then
             echo "::error::Factory PR modifies protected paths:"
             printf '%s\n' "$BAD"

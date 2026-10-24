@@ -66,7 +66,6 @@ export async function loadSpecIssues(
     : [config.labels.spec];
   const issues = await github.listIssues(cwd, labels);
   return issues
-    .filter((issue) => !issue.labels.includes(config.labels.holdout))
     .map(specFromIssue)
     .sort((left, right) => left.number - right.number);
 }
@@ -76,9 +75,6 @@ export async function loadSpec(cwd: string, config: FactoryConfig, number: numbe
   if (!issue) return null;
   if (!issue.labels.includes(config.labels.spec)) {
     throw new Error(`Issue #${number} is not labeled ${config.labels.spec}.`);
-  }
-  if (issue.labels.includes(config.labels.holdout)) {
-    throw new Error(`Issue #${number} is a holdout scenario, not a spec. The wall says no.`);
   }
   return specFromIssue(issue);
 }
@@ -114,8 +110,8 @@ export function renderPrompt(spec: Spec, config: FactoryConfig, feedback?: strin
     "- End with a short summary of what changed and the commands you ran.",
     "",
     "## The wall (non-negotiable)",
-    `- GitHub issues labeled \`${config.labels.holdout}\` are holdout acceptance scenarios. Do not list, read, search, or infer their contents. Do not use \`gh\` at all; the token available to you is intentionally invalid.`,
-    "- Do not modify `factory/`, `.github/`, `vitest.holdout.config.ts`, or `test/setup.ts`.",
+    `- \`${config.holdouts?.dir || "holdouts"}/\` contains the acceptance tests that grade this work. Do not list, read, search, or infer their contents. Do not use \`gh\` at all; the token available to you is intentionally invalid.`,
+    "- Do not modify `factory/`, `.github/`, `holdouts/`, `vitest.holdout.config.ts`, or `test/setup.ts`.",
     "- Do not add or edit files whose names end in `.heldout.ts` or `.heldout.tsx`.",
     "- Do not run `git worktree`, `git switch`, `git checkout -b`, or `git commit`. Stay in the directory the factory gave you.",
   ];

@@ -10,8 +10,9 @@ import { run, type RunResult } from "./exec";
  *
  * The wall is not just a sentence in the prompt: the agent's `gh` environment
  * points at a throwaway config directory and carries an invalid token, so it
- * cannot list the private holdout issues that grade it. The evaluator runs in
- * this process, after the agent exits, with the real credentials.
+ * cannot look up specs, issues or historical holdout scenarios on GitHub. The
+ * evaluator runs in this process, after the agent exits, with the real
+ * credentials.
  */
 function lockedEnv(): NodeJS.ProcessEnv {
   const dir = join(tmpdir(), `github-ui-factory-gh-${process.pid}-${Date.now()}`);
