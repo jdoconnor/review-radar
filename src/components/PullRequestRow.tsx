@@ -10,6 +10,7 @@ import {
   DraftPill,
   LabelChips,
   NewActivityPill,
+  ReviewersPill,
   TeamReviewPill,
 } from "./Bits";
 
@@ -81,6 +82,13 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
           <DirectReviewPill viewer={viewerLogin} />
         ) : null}
         <TeamReviewPill teams={pr.teamReviewRequests} />
+        {kind === "mine" ? (
+          <ReviewersPill
+            count={pr.pendingReviewRequests}
+            names={pr.requestedReviewers}
+            known={pr.reviewersKnown}
+          />
+        ) : null}
         <ChangesPill count={pr.changesRequested} />
         <NewActivityPill count={pr.newActivity} />
         <span className="status-icons" data-testid="status-icons">

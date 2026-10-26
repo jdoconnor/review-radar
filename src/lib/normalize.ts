@@ -102,6 +102,28 @@ export function teamReviewRequests(pr: PullRequestNode): string[] {
 }
 
 /**
+ * Display labels for the pending review requests, users first. The nodes are
+ * capped by the query page size, so this may hold fewer entries than
+ * `reviewRequests.totalCount`.
+ */
+export function requestedReviewers(pr: PullRequestNode): string[] {
+  const nodes = pr.reviewRequests?.nodes ?? [];
+  const reviewers: string[] = [];
+  for (const node of nodes) {
+    const reviewer = node.requestedReviewer;
+    if (!reviewer) continue;
+    const name =
+      reviewer.__typename === "User"
+        ? (reviewer.login ?? "").trim()
+        : (reviewer.name ?? "").trim() || (reviewer.slug ?? "").trim();
+    if (!name) continue;
+    const label = reviewer.__typename === "User" ? `@${name}` : name;
+    if (!reviewers.includes(label)) reviewers.push(label);
+  }
+  return reviewers;
+}
+
+/**
  * True when the viewer is named directly in `reviewRequests`. Team requests do
  * not count: they are surfaced separately by `teamReviewRequests`.
  */
@@ -168,6 +190,8 @@ export function toSummary(
     reviewRequestedFromMe: options.reviewRequestedFromMe,
     directReviewRequest: directReviewRequest(pr, viewerLogin),
     pendingReviewRequests: pr.reviewRequests?.totalCount ?? 0,
+    requestedReviewers: requestedReviewers(pr),
+    reviewersKnown: pr.reviewRequests != null,
     teamReviewRequests: teamReviewRequests(pr),
     approvals: approvals.length,
     approvedByViewer,

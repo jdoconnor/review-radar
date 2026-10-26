@@ -109,6 +109,10 @@ export interface PullRequestSummary {
   /** A `User` reviewer in `reviewRequests` is the viewer. */
   directReviewRequest: boolean;
   pendingReviewRequests: number;
+  /** Display labels for pending requests: users as `@login`, teams by name. */
+  requestedReviewers: string[];
+  /** False when GitHub omitted `reviewRequests`, for example on a permission error. */
+  reviewersKnown: boolean;
   teamReviewRequests: string[];
   approvals: number;
   approvedByViewer: boolean;

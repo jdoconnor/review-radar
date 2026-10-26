@@ -631,6 +631,17 @@ select:focus {
   color: var(--accent);
 }
 
+.reviewers {
+  font-variant-numeric: tabular-nums;
+}
+
+.reviewers.missing {
+  border-color: var(--amber-border);
+  background: var(--amber-soft);
+  color: var(--amber);
+  font-weight: 650;
+}
+
 .offline {
   border-color: var(--amber);
   color: var(--amber);
