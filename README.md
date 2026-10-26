@@ -1,5 +1,7 @@
 # review-radar
 
+Heads up: most of this is AI slop. I'm using this as a pilot to see how the software factory patten would work in practice.
+
 A cache-first GitHub review dashboard. Two questions, one screen:
 
 - **Needs my review** — open pull requests with an outstanding review request
