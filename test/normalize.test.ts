@@ -348,3 +348,45 @@ describe("review request kinds", () => {
     );
   });
 });
+
+describe("reviewer count", () => {
+  it("counts users and teams and labels them for a tooltip", () => {
+    const summary = summaryWithReviewers(11, [
+      { requestedReviewer: { __typename: "User", login: "alice" } },
+      { requestedReviewer: { __typename: "Team", name: "", slug: "platform" } },
+    ]);
+    expect(summary.pendingReviewRequests).toBe(2);
+    expect(summary.requestedReviewers).toEqual(["@alice", "platform"]);
+    expect(summary.reviewersKnown).toBe(true);
+  });
+
+  it("uses totalCount even when the node page is shorter", () => {
+    const summary = toSummary(
+      makePr({
+        reviewRequests: {
+          totalCount: 25,
+          nodes: [{ requestedReviewer: { __typename: "User", login: "alice" } }],
+        },
+      }),
+      { lastSeenAt: null, reviewRequestedFromMe: false },
+    );
+    expect(summary.pendingReviewRequests).toBe(25);
+    expect(summary.requestedReviewers).toEqual(["@alice"]);
+  });
+
+  it("distinguishes zero reviewers from unknown reviewer data", () => {
+    const none = toSummary(
+      makePr({ reviewRequests: { totalCount: 0, nodes: [] } }),
+      { lastSeenAt: null, reviewRequestedFromMe: false },
+    );
+    expect(none.pendingReviewRequests).toBe(0);
+    expect(none.reviewersKnown).toBe(true);
+
+    const unknown = toSummary(makePr({ reviewRequests: null }), {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+    });
+    expect(unknown.pendingReviewRequests).toBe(0);
+    expect(unknown.reviewersKnown).toBe(false);
+  });
+});

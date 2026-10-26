@@ -248,6 +248,40 @@ export function TeamReviewPill({ teams }: { teams: string[] }) {
   );
 }
 
+/**
+ * How many reviewers are already requested on an authored PR. Zero is called
+ * out rather than hidden, because that is the case a user wants to notice.
+ */
+export function ReviewersPill({
+  count,
+  names,
+  known,
+}: {
+  count: number;
+  names: string[];
+  known: boolean;
+}) {
+  if (!known) return null;
+  const noun = count === 1 ? "reviewer" : "reviewers";
+  const listed = names.slice(0, 5).join(", ");
+  const more = count > names.length ? `${listed ? ", " : ""}${count - names.length} more` : "";
+  const title =
+    count === 0
+      ? "No reviewers requested. Add a reviewer on GitHub if you meant to."
+      : `${count} ${noun} requested${listed ? `: ${listed}${more}` : ""}`;
+  return (
+    <span
+      className={`pill reviewers${count === 0 ? " missing" : ""}`}
+      data-testid="reviewers-pill"
+      data-count={count}
+      data-reviewer-state={count === 0 ? "none" : "requested"}
+      title={title}
+    >
+      {count === 0 ? "No reviewers" : `${count} ${noun}`}
+    </span>
+  );
+}
+
 export function LabelChips({ labels }: { labels: PullRequestSummary["labels"] }) {
   return (
     <span className="labels">
