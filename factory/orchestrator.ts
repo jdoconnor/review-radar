@@ -53,19 +53,49 @@ async function buildWithAgent(
   config: FactoryConfig,
   spec: Spec,
   worktree: Worktree,
-): Promise<{ ok: boolean; attempts: number; feedback: string; agentOutput: string }> {
+): Promise<{
+  ok: boolean;
+  attempts: number;
+  feedback: string;
+  agentOutput: string;
+  isolationBreach?: boolean;
+}> {
   const maxAttempts = Math.min(config.codingAgent.maxAttempts, config.limits.maxAttemptsPerIssue);
   let feedback = "";
   let agentOutput = "";
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     assertNoStop();
+    // The agent must only ever touch its worktree. Snapshot the factory
+    // checkout so a broken adapter (for example, one that attaches to a shared
+    // server rooted in the primary) is caught before it becomes a commit or a
+    // silent edit to the grader.
+    const checkoutBefore = await changedFiles(repoRoot());
     const prompt = renderPrompt(spec, config, feedback);
     const result = await runCodingAgent(config, worktree.path, prompt, {
       issueNumber: spec.number,
       attempt,
     });
     agentOutput = `${result.stdout}\n${result.stderr}`.trim();
+
+    const leaked = (await changedFiles(repoRoot())).filter(
+      (file) => !checkoutBefore.includes(file),
+    );
+    if (leaked.length > 0) {
+      return {
+        ok: false,
+        attempts: attempt,
+        feedback: [
+          "Isolation breach: the coding agent changed the factory checkout instead of its worktree.",
+          "",
+          `Files: ${leaked.join(", ")}`,
+          "",
+          "Nothing was committed. Inspect and clean those files, then re-run.",
+        ].join("\n"),
+        agentOutput,
+        isolationBreach: true,
+      };
+    }
 
     if (result.timedOut) {
       feedback = `The agent timed out after ${config.codingAgent.timeoutMinutes} minutes.`;
@@ -196,8 +226,11 @@ export async function runSpec(
 
   const build = await buildWithAgent(config, spec, worktree);
   if (!build.ok) {
+    const headline = build.isolationBreach
+      ? "Factory run stopped: the coding agent wrote outside its worktree."
+      : `Factory run failed the build gate after ${build.attempts} attempt(s).`;
     const message = [
-      `Factory run failed the build gate after ${build.attempts} attempt(s).`,
+      headline,
       "",
       "The worktree is kept for inspection:",
       `\`${worktree.path}\``,
@@ -217,7 +250,7 @@ export async function runSpec(
       pr: null,
       report: null,
       attempts: build.attempts,
-      reason: "build-gate-failed",
+      reason: build.isolationBreach ? "isolation-breach" : "build-gate-failed",
       merged: false,
     };
     writeLedger(outcome, config);
