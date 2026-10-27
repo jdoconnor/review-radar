@@ -434,6 +434,17 @@ select:focus {
   border-left: 3px solid var(--accent);
 }
 
+.pr-row.readiness-ready {
+  border-left: 3px solid var(--green);
+  background:
+    linear-gradient(180deg, var(--green-soft), transparent 60%),
+    var(--bg-raised);
+}
+
+.pr-row.readiness-ready:hover {
+  background: var(--green-soft);
+}
+
 .pr-main {
   min-width: 0;
   flex: 1;
@@ -545,6 +556,47 @@ select:focus {
 .pill.direct {
   border-color: var(--accent-border);
   color: var(--accent-strong);
+}
+
+.pill.readiness {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill.readiness.ready {
+  border-color: var(--green-border);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.pill.readiness.waiting {
+  border-color: var(--border-strong);
+  color: var(--muted);
+}
+
+.readiness-dot {
+  width: 0.5em;
+  height: 0.5em;
+  flex: none;
+  border-radius: 999rem;
+  background: currentColor;
+}
+
+.pill.readiness.waiting .readiness-dot {
+  background: var(--amber);
+}
+
+.merge-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.count.ready {
+  background: var(--green-soft);
+  color: var(--green);
+  font-weight: 650;
 }
 
 .status-icons {

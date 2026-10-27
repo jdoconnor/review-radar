@@ -87,6 +87,25 @@ export interface SearchPayload {
   rateLimit: RateLimit;
 }
 
+/** Every condition that keeps an authored pull request from being merged. */
+export type MergeBlocker =
+  | "draft"
+  | "conflicts"
+  | "changes-requested"
+  | "ci-failing"
+  | "ci-running"
+  | "review-required"
+  | "reviewers-requested"
+  | "mergeability-unknown";
+
+export interface MergeReadiness {
+  state: "ready" | "waiting";
+  /** Blocking conditions, most important first, so `reasons[0]` is the headline. */
+  blockers: MergeBlocker[];
+  /** Display labels aligned with `blockers`. */
+  reasons: string[];
+}
+
 export interface PullRequestSummary {
   key: string;
   id: string;
@@ -123,6 +142,8 @@ export interface PullRequestSummary {
   newActivity: number;
   lastSeenAt: number | null;
   checks: CheckSummary;
+  /** Whether every known condition for merging is satisfied, and what is left. */
+  readiness: MergeReadiness;
 }
 
 export interface ViewerPayload {

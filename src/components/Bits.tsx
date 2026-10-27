@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { CheckState, PullRequestSummary } from "../lib/types";
+import type { CheckState, MergeReadiness, PullRequestSummary } from "../lib/types";
 import { checkLabel, relativeTime } from "../lib/normalize";
 
 export function Spinner({ label = "Loading" }: { label?: string }) {
@@ -278,6 +278,32 @@ export function ReviewersPill({
       title={title}
     >
       {count === 0 ? "No reviewers" : `${count} ${noun}`}
+    </span>
+  );
+}
+
+/**
+ * One-glance answer for an authored PR: green when nothing is left to wait on,
+ * otherwise the headline blocker. The complete list is in the tooltip so a row
+ * never hides *why* it is waiting.
+ */
+export function MergeReadinessPill({ readiness }: { readiness: MergeReadiness }) {
+  const ready = readiness.state === "ready";
+  const reasons = readiness.reasons;
+  const label = ready ? "Ready to merge" : `Waiting: ${reasons[0] ?? "something"}`;
+  const description = ready
+    ? "Ready to merge: no conflicts, no failing checks, and no review outstanding."
+    : `Waiting on ${reasons.join(", ")}.`;
+  return (
+    <span
+      className={`pill readiness ${ready ? "ready" : "waiting"}`}
+      data-testid="merge-readiness"
+      data-readiness={readiness.state}
+      data-blockers={readiness.blockers.join(",")}
+      title={description}
+    >
+      <span className="readiness-dot" aria-hidden="true" />
+      {label}
     </span>
   );
 }

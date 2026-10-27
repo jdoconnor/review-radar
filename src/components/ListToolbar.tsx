@@ -8,6 +8,7 @@ export interface Filters {
   onlyNew: boolean;
   onlyDirect: boolean;
   onlyTeam: boolean;
+  onlyReady: boolean;
 }
 
 export type SortOrder = "default" | "attention" | "oldest" | "newest";
@@ -20,6 +21,7 @@ export const EMPTY_FILTERS: Filters = {
   onlyNew: false,
   onlyDirect: false,
   onlyTeam: false,
+  onlyReady: false,
 };
 
 export function hasActiveFilters(filters: Filters): boolean {
@@ -30,7 +32,8 @@ export function hasActiveFilters(filters: Filters): boolean {
     filters.onlyChanges ||
     filters.onlyNew ||
     filters.onlyDirect ||
-    filters.onlyTeam
+    filters.onlyTeam ||
+    filters.onlyReady
   );
 }
 
@@ -128,6 +131,16 @@ export function ListToolbar({
       ) : null}
       {view !== "review" ? (
         <div className="chips" role="group" aria-label="Quick filters">
+          <button
+            type="button"
+            className={`chip ${filters.onlyReady ? "active" : ""}`}
+            aria-pressed={filters.onlyReady}
+            title="Only your pull requests with nothing left to wait on"
+            onClick={() => onFiltersChange({ ...filters, onlyReady: !filters.onlyReady })}
+            data-testid="filter-ready"
+          >
+            Ready to merge
+          </button>
           <button
             type="button"
             className={`chip ${filters.onlyNew ? "active" : ""}`}

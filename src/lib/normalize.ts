@@ -2,6 +2,8 @@ import type {
   CheckContextNode,
   CheckState,
   CheckSummary,
+  MergeBlocker,
+  MergeReadiness,
   PullRequestNode,
   PullRequestSummary,
   ReviewNode,
@@ -139,6 +141,78 @@ export function directReviewRequest(pr: PullRequestNode, viewerLogin?: string | 
   });
 }
 
+const MERGE_BLOCKER_LABELS: Record<MergeBlocker, string> = {
+  draft: "Draft",
+  conflicts: "Merge conflicts",
+  "changes-requested": "Changes requested",
+  "ci-failing": "CI failing",
+  "ci-running": "CI running",
+  "review-required": "Review required",
+  "reviewers-requested": "Reviewers requested",
+  "mergeability-unknown": "Mergeability unknown",
+};
+
+type ReadinessInput = Pick<
+  PullRequestSummary,
+  | "isDraft"
+  | "mergeable"
+  | "reviewDecision"
+  | "approvals"
+  | "changesRequested"
+  | "pendingReviewRequests"
+  | "reviewersKnown"
+  | "checks"
+>;
+
+/**
+ * GitHub reports whether a branch is mergeable, not whether the author is still
+ * waiting on something. This combines the review verdict, CI rollup, draft and
+ * conflict state into one answer: `ready` means nothing we can see is in the
+ * way, and every blocker is listed when something is.
+ *
+ * `reviewDecision` is GitHub's own verdict, so it already accounts for branch
+ * protection. A null decision means no approval rule is enforced; with no
+ * approval yet, an outstanding review request still counts as waiting.
+ */
+export function mergeReadiness(pr: ReadinessInput): MergeReadiness {
+  const blockers: MergeBlocker[] = [];
+  if (pr.isDraft) blockers.push("draft");
+  if (pr.mergeable === "CONFLICTING") blockers.push("conflicts");
+  if (pr.changesRequested > 0) blockers.push("changes-requested");
+  if (pr.checks.state === "failure") blockers.push("ci-failing");
+  else if (pr.checks.state === "pending") blockers.push("ci-running");
+  if (!reviewsSatisfied(pr) && pr.changesRequested === 0) {
+    const waitingOnReviewer = pr.reviewersKnown && pr.approvals === 0 && pr.pendingReviewRequests > 0;
+    blockers.push(waitingOnReviewer ? "reviewers-requested" : "review-required");
+  }
+  if (pr.mergeable === "UNKNOWN") blockers.push("mergeability-unknown");
+
+  return {
+    state: blockers.length === 0 ? "ready" : "waiting",
+    blockers,
+    reasons: blockers.map((blocker) => MERGE_BLOCKER_LABELS[blocker]),
+  };
+}
+
+function reviewsSatisfied(pr: ReadinessInput): boolean {
+  if (pr.reviewDecision === "APPROVED") return true;
+  if (pr.reviewDecision === "REVIEW_REQUIRED" || pr.reviewDecision === "CHANGES_REQUESTED") return false;
+  // No approval rule is enforced. Without an approval and with a reviewer still
+  // requested, the author is waiting on that review.
+  if (pr.approvals > 0) return true;
+  return !pr.reviewersKnown || pr.pendingReviewRequests === 0;
+}
+
+export function countMergeReadiness(
+  items: Array<Pick<PullRequestSummary, "readiness">>,
+): { ready: number; waiting: number } {
+  let ready = 0;
+  for (const item of items) {
+    if (item.readiness.state === "ready") ready += 1;
+  }
+  return { ready, waiting: items.length - ready };
+}
+
 function activityAfter(pr: PullRequestNode, lastSeenAt: number | null): number {
   if (lastSeenAt === null) return 0;
   const author = pr.author?.login ?? "";
@@ -169,6 +243,20 @@ export function toSummary(
   const approvalsByOthers = viewerLogin
     ? approvals.filter((review) => review.author?.login !== viewerLogin).length
     : approvals.length;
+  const changesRequested = latest.filter((review) => review.state === "CHANGES_REQUESTED").length;
+  const checks = summarizeChecks(pr);
+  const pendingReviewRequests = pr.reviewRequests?.totalCount ?? 0;
+  const reviewersKnown = pr.reviewRequests != null;
+  const readiness = mergeReadiness({
+    isDraft: pr.isDraft,
+    mergeable: pr.mergeable,
+    reviewDecision: pr.reviewDecision,
+    approvals: approvals.length,
+    changesRequested,
+    pendingReviewRequests,
+    reviewersKnown,
+    checks,
+  });
   return {
     key,
     id: pr.id,
@@ -189,19 +277,20 @@ export function toSummary(
     labels: pr.labels?.nodes ?? [],
     reviewRequestedFromMe: options.reviewRequestedFromMe,
     directReviewRequest: directReviewRequest(pr, viewerLogin),
-    pendingReviewRequests: pr.reviewRequests?.totalCount ?? 0,
+    pendingReviewRequests,
     requestedReviewers: requestedReviewers(pr),
-    reviewersKnown: pr.reviewRequests != null,
+    reviewersKnown,
     teamReviewRequests: teamReviewRequests(pr),
     approvals: approvals.length,
     approvedByViewer,
     approvalsByOthers,
     viewerKnown: Boolean(viewerLogin),
-    changesRequested: latest.filter((review) => review.state === "CHANGES_REQUESTED").length,
+    changesRequested,
     comments: pr.comments?.totalCount ?? 0,
     newActivity: activityAfter(pr, options.lastSeenAt),
     lastSeenAt: options.lastSeenAt,
-    checks: summarizeChecks(pr),
+    checks,
+    readiness,
   };
 }
 
@@ -209,10 +298,10 @@ export function sortForAttention(items: PullRequestSummary[]): PullRequestSummar
   const score = (pr: PullRequestSummary): number => {
     let value = 0;
     if (pr.changesRequested > 0) value += 100;
+    if (pr.readiness.state === "ready") value += 90;
     if (pr.checks.state === "failure") value += 80;
     if (pr.mergeable === "CONFLICTING") value += 60;
     if (pr.newActivity > 0) value += 40;
-    if (pr.reviewDecision === "APPROVED") value += 20;
     if (pr.isDraft) value -= 50;
     return value;
   };
@@ -233,6 +322,7 @@ export function filterSummaries(
     onlyNew: boolean;
     onlyDirect?: boolean;
     onlyTeam?: boolean;
+    onlyReady?: boolean;
   },
 ): PullRequestSummary[] {
   const text = filters.text.trim().toLowerCase();
@@ -243,6 +333,7 @@ export function filterSummaries(
     if (filters.onlyNew && pr.newActivity === 0) return false;
     if (filters.onlyDirect && !pr.directReviewRequest) return false;
     if (filters.onlyTeam && pr.teamReviewRequests.length === 0) return false;
+    if (filters.onlyReady && pr.readiness.state !== "ready") return false;
     if (!text) return true;
     const haystack = [pr.title, pr.repo, pr.author, String(pr.number), ...pr.labels.map((label) => label.name)]
       .join(" ")
