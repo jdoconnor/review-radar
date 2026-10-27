@@ -53,7 +53,11 @@ export async function runCodingAgent(
     args = [...config.codingAgent.command.slice(1), prompt];
   } else {
     command = "opencode";
-    args = ["run", "--auto"];
+    // `--standalone` is load-bearing. Without it the CLI attaches to the shared
+    // background server, whose project directory is whichever checkout started
+    // it — so the agent edits the primary checkout instead of the worktree it
+    // was given. A private server inherits the cwd, which the wall depends on.
+    args = ["run", "--auto", "--standalone"];
     if (config.codingAgent.model) args.push("--model", config.codingAgent.model);
     if (config.codingAgent.agent) args.push("--agent", config.codingAgent.agent);
     args.push(prompt);
