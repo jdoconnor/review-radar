@@ -8,6 +8,7 @@ import { countMergeReadiness, toSummary, relativeTime } from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
+import { loadFilterDefaults, saveFilterDefaults } from "../lib/filterDefaults";
 import { EMPTY_FILTERS, ListToolbar } from "./ListToolbar";
 import type { Filters, SortOrder } from "./ListToolbar";
 import { PullRequestList } from "./PullRequestList";
@@ -35,33 +36,49 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
 
   // URL state persistence: read from location.hash on mount, write on tab/sort/filter changes.
   // This lets users share a URL and have the same view, and refresh preserves state.
+  // Filter defaults are loaded from IndexedDB, then URL overrides are applied.
   // Effects are guarded with typeof window to avoid issues in test environments
   // (jsdom) where window.location may not behave like a browser.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const hash = window.location.hash;
-    if (!hash || !hash.startsWith("#/")) return;
-    const parts = hash.slice(2).split("/"); // strip "#/" prefix
-    // Expected format: t:mine/q:review/s:attention/f:true,c:true,n:false
-    const lookup: Record<string, string> = {};
-    parts.forEach((part) => {
-      const idx = part.indexOf(":");
-      if (idx > 0) lookup[part.slice(0, idx)] = part.slice(idx + 1);
-    });
-    if (lookup.t) setTab(lookup.t === "mine" ? "mine" : "review");
-    if (lookup.s) setSort(lookup.s as SortOrder);
-    if (lookup.q !== undefined) setFilters({ ...filters, text: lookup.q });
-    if (lookup.r !== undefined) setFilters({ ...filters, repo: lookup.r });
-    if (lookup.f) {
-      const flags = lookup.f.split(",");
-      setFilters({
-        ...filters,
-        onlyFailing: flags.includes("failing"),
-        onlyChanges: flags.includes("changes"),
-        onlyNew: flags.includes("new"),
+    void (async () => {
+      const defaults = await loadFilterDefaults();
+      const base = defaults ?? EMPTY_FILTERS;
+      const hash = window.location.hash;
+      if (!hash || !hash.startsWith("#/")) {
+        setFilters(base);
+        setTab(settings.defaultTab);
+        setSort("default");
+        return;
+      }
+      const parts = hash.slice(2).split("/"); // strip "#/" prefix
+      // Expected format: t:mine/q:review/s:attention/f:true,c:true,n:false
+      const lookup: Record<string, string> = {};
+      parts.forEach((part) => {
+        const idx = part.indexOf(":");
+        if (idx > 0) lookup[part.slice(0, idx)] = part.slice(idx + 1);
       });
-    }
-  }, []); // initial load only; hash changes are rare
+      const mergedFilters: Filters = { ...base };
+      if (lookup.t) setTab(lookup.t === "mine" ? "mine" : "review");
+      if (lookup.s) setSort(lookup.s as SortOrder);
+      if (lookup.q !== undefined) mergedFilters.text = lookup.q;
+      if (lookup.r !== undefined) mergedFilters.repo = lookup.r;
+      if (lookup.f) {
+        const flags = lookup.f.split(",");
+        mergedFilters.onlyFailing = flags.includes("failing");
+        mergedFilters.onlyChanges = flags.includes("changes");
+        mergedFilters.onlyNew = flags.includes("new");
+      }
+      setFilters(mergedFilters);
+    })();
+  }, [settings.defaultTab]); // initial load only; hash changes are rare
+
+  // Persist filter defaults to IndexedDB whenever they change, so they
+  // survive page reloads without needing a shared URL.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    void saveFilterDefaults(filters);
+  }, [filters.text, filters.repo, filters.onlyFailing, filters.onlyChanges, filters.onlyNew]);
 
   // Write URL hash when tab or sort changes, or when a quick filter chip is toggled.
   // We memoize the hash string so the effect doesn't fire on every re-render.
