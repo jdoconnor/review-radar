@@ -32,6 +32,57 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [sort, setSort] = useState<SortOrder>("default");
   const searchRef = useRef<HTMLInputElement>(null);
   const wide = useMediaQuery("(min-width: 68.75em)");
+
+  // URL state persistence: read from location.hash on mount, write on tab/sort/filter changes.
+  // This lets users share a URL and have the same view, and refresh preserves state.
+  // Effects are guarded with typeof window to avoid issues in test environments
+  // (jsdom) where window.location may not behave like a browser.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (!hash || !hash.startsWith("#/")) return;
+    const parts = hash.slice(2).split("/"); // strip "#/" prefix
+    // Expected format: t:mine/q:review/s:attention/f:true,c:true,n:false
+    const lookup: Record<string, string> = {};
+    parts.forEach((part) => {
+      const idx = part.indexOf(":");
+      if (idx > 0) lookup[part.slice(0, idx)] = part.slice(idx + 1);
+    });
+    if (lookup.t) setTab(lookup.t === "mine" ? "mine" : "review");
+    if (lookup.s) setSort(lookup.s as SortOrder);
+    if (lookup.q !== undefined) setFilters({ ...filters, text: lookup.q });
+    if (lookup.r !== undefined) setFilters({ ...filters, repo: lookup.r });
+    if (lookup.f) {
+      const flags = lookup.f.split(",");
+      setFilters({
+        ...filters,
+        onlyFailing: flags.includes("failing"),
+        onlyChanges: flags.includes("changes"),
+        onlyNew: flags.includes("new"),
+      });
+    }
+  }, []); // initial load only; hash changes are rare
+
+  // Write URL hash when tab or sort changes, or when a quick filter chip is toggled.
+  // We memoize the hash string so the effect doesn't fire on every re-render.
+  const hashParts = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(`t:${tab}`);
+    parts.push(`q:${filters.text}`);
+    parts.push(`s:${sort}`);
+    const flags: string[] = [];
+    if (filters.onlyFailing) flags.push("failing");
+    if (filters.onlyChanges) flags.push("changes");
+    if (filters.onlyNew) flags.push("new");
+    if (flags.length > 0) parts.push(`f:${flags.join(",")}`);
+    return parts.join("/");
+  }, [tab, sort, filters.onlyFailing, filters.onlyChanges, filters.onlyNew]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.location.hash = hashParts;
+  }, [hashParts]); // only when the computed hash string changes
+
   const sessionViewer = (() => {
     try {
       return sessionStorage.getItem("review-radar.viewer");
