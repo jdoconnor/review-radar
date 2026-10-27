@@ -9,6 +9,7 @@ import {
   DirectReviewPill,
   DraftPill,
   LabelChips,
+  MergeReadinessPill,
   NewActivityPill,
   ReviewersPill,
   TeamReviewPill,
@@ -26,9 +27,12 @@ interface Props {
 export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMarkSeen }: Props) {
   return (
     <article
-      className={`pr-row ${selected ? "selected" : ""} ${kind === "review" ? "needs-review" : ""}`}
+      className={`pr-row ${selected ? "selected" : ""} ${
+        kind === "review" ? "needs-review" : `readiness-${pr.readiness.state}`
+      }`}
       data-testid="pr-row"
       data-pr-key={pr.key}
+      data-readiness={kind === "mine" ? pr.readiness.state : undefined}
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
@@ -77,6 +81,7 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
       </div>
 
       <div className="pr-status">
+        {kind === "mine" ? <MergeReadinessPill readiness={pr.readiness} /> : null}
         {pr.isDraft ? <DraftPill /> : null}
         {kind === "review" && pr.directReviewRequest ? (
           <DirectReviewPill viewer={viewerLogin} />

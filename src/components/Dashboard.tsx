@@ -4,7 +4,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
-import { toSummary, relativeTime } from "../lib/normalize";
+import { countMergeReadiness, toSummary, relativeTime } from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
@@ -93,6 +93,8 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       });
     });
   }, [mineQuery.data, seenVersion, viewerLogin]);
+
+  const mineReadyCount = useMemo(() => countMergeReadiness(mineItems).ready, [mineItems]);
 
   const repos = useMemo(
     () =>
@@ -234,6 +236,15 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
             >
               My pull requests
               {mineItems.length > 0 ? <span className="count">{mineItems.length}</span> : null}
+              {mineReadyCount > 0 ? (
+                <span
+                  className="count ready"
+                  data-testid="mine-ready-count"
+                  title={`${mineReadyCount} ready to merge`}
+                >
+                  {mineReadyCount} ready
+                </span>
+              ) : null}
             </button>
           </nav>
         ) : null}

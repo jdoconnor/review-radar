@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { GithubError } from "../lib/github";
-import { filterSummaries, sortForAttention } from "../lib/normalize";
+import { countMergeReadiness, filterSummaries, sortForAttention } from "../lib/normalize";
 import type { PullRequestSummary } from "../lib/types";
 import { EmptyState, Spinner } from "./Bits";
 import { hasActiveFilters } from "./ListToolbar";
@@ -48,12 +48,13 @@ export function PullRequestList({
 }: Props) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Review requests have no last-seen mark, and my own pull requests are never
-  // requested from me, so each queue ignores the other queue's chips.
+  // Review requests have no last-seen mark or merge readiness, and my own pull
+  // requests are never requested from me, so each queue ignores the other
+  // queue's chips.
   const effectiveFilters = useMemo(
     () =>
       kind === "review"
-        ? { ...filters, onlyNew: false }
+        ? { ...filters, onlyNew: false, onlyReady: false }
         : { ...filters, onlyDirect: false, onlyTeam: false },
     [filters, kind],
   );
@@ -69,6 +70,8 @@ export function PullRequestList({
     }
     return sortForAttention(filtered);
   }, [items, effectiveFilters, effectiveSort]);
+
+  const readinessCounts = useMemo(() => countMergeReadiness(visible), [visible]);
 
   useEffect(() => {
     if (selectedKey && !visible.some((item) => item.key === selectedKey)) setSelectedKey(null);
@@ -143,6 +146,20 @@ export function PullRequestList({
         <div className="list-head">
           <h2>{heading}</h2>
           <span className="count">{items.length}</span>
+        </div>
+      ) : null}
+      {kind === "mine" && visible.length > 0 ? (
+        <div className="merge-summary" data-testid="merge-summary">
+          {readinessCounts.ready > 0 ? (
+            <span className="pill readiness ready" data-testid="ready-count">
+              {readinessCounts.ready} ready to merge
+            </span>
+          ) : null}
+          {readinessCounts.waiting > 0 ? (
+            <span className="pill readiness waiting" data-testid="waiting-count">
+              {readinessCounts.waiting} waiting on something
+            </span>
+          ) : null}
         </div>
       ) : null}
       {error ? (

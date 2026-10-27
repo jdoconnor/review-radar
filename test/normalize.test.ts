@@ -2,13 +2,47 @@ import { describe, expect, it } from "vitest";
 import {
   approvalCount,
   changesRequestedCount,
+  countMergeReadiness,
   filterSummaries,
   latestReviews,
   sortForAttention,
   summarizeChecks,
   toSummary,
 } from "../src/lib/normalize";
+import type { PullRequestNode } from "../src/lib/types";
 import { makePr } from "./fixtures";
+
+const GREEN_CHECKS: PullRequestNode["commits"] = {
+  nodes: [
+    {
+      commit: {
+        statusCheckRollup: {
+          state: "SUCCESS",
+          contexts: { totalCount: 0, nodes: [] },
+        },
+      },
+    },
+  ],
+};
+
+function readyPr(overrides: Partial<PullRequestNode> = {}): PullRequestNode {
+  return makePr({
+    reviewDecision: "APPROVED",
+    reviews: {
+      nodes: [
+        { id: "R_ready", state: "APPROVED", submittedAt: "2026-10-20T11:00:00Z", author: { login: "alice" } },
+      ],
+    },
+    reviewRequests: { totalCount: 0, nodes: [] },
+    commits: GREEN_CHECKS,
+    ...overrides,
+  });
+}
+
+function readinessOf(pr: PullRequestNode) {
+  return toSummary(pr, { lastSeenAt: null, reviewRequestedFromMe: false }).readiness;
+}
+
 
 describe("latestReviews", () => {
   it("keeps only the most recent review per author", () => {
@@ -199,6 +233,113 @@ describe("sortForAttention", () => {
       reviewRequestedFromMe: false,
     });
     expect(sortForAttention([approved, urgent])[0]?.number).toBe(1);
+  });
+});
+
+describe("merge readiness", () => {
+  it("is ready when the review is approved, checks are green and the branch is mergeable", () => {
+    expect(readinessOf(readyPr())).toEqual({ state: "ready", blockers: [], reasons: [] });
+  });
+
+  it("lists CI and review blockers in a stable order", () => {
+    const readiness = readinessOf(makePr());
+    expect(readiness.state).toBe("waiting");
+    expect(readiness.blockers).toEqual(["ci-failing", "review-required"]);
+    expect(readiness.reasons).toEqual(["CI failing", "Review required"]);
+  });
+
+  it("treats drafts and conflicts as blockers", () => {
+    expect(readinessOf(readyPr({ isDraft: true })).blockers).toEqual(["draft"]);
+    expect(readinessOf(readyPr({ mergeable: "CONFLICTING" })).blockers).toEqual(["conflicts"]);
+  });
+
+  it("waits while checks are still running", () => {
+    const readiness = readinessOf(
+      readyPr({
+        commits: {
+          nodes: [
+            {
+              commit: {
+                statusCheckRollup: {
+                  state: "PENDING",
+                  contexts: {
+                    totalCount: 1,
+                    nodes: [
+                      { __typename: "CheckRun", name: "test", status: "IN_PROGRESS", conclusion: null },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    );
+    expect(readiness.blockers).toEqual(["ci-running"]);
+  });
+
+  it("does not also demand a fresh review when changes were requested", () => {
+    const readiness = readinessOf(
+      readyPr({
+        reviewDecision: "CHANGES_REQUESTED",
+        reviews: {
+          nodes: [
+            { id: "R", state: "CHANGES_REQUESTED", submittedAt: "2026-10-20T11:00:00Z", author: { login: "alice" } },
+          ],
+        },
+      }),
+    );
+    expect(readiness.blockers).toEqual(["changes-requested"]);
+  });
+
+  it("waits on requested reviewers when no approval rule is enforced yet", () => {
+    const readiness = readinessOf(
+      readyPr({
+        reviewDecision: null,
+        reviews: { nodes: [] },
+        reviewRequests: {
+          totalCount: 2,
+          nodes: [{ requestedReviewer: { __typename: "User", login: "alice" } }],
+        },
+      }),
+    );
+    expect(readiness.blockers).toEqual(["reviewers-requested"]);
+  });
+
+  it("does not require a review when none is requested or enforced", () => {
+    const readiness = readinessOf(
+      readyPr({
+        reviewDecision: null,
+        reviews: { nodes: [] },
+        reviewRequests: { totalCount: 0, nodes: [] },
+      }),
+    );
+    expect(readiness.state).toBe("ready");
+  });
+
+  it("does not claim ready while mergeability is unknown", () => {
+    expect(readinessOf(readyPr({ mergeable: "UNKNOWN" })).blockers).toEqual(["mergeability-unknown"]);
+  });
+
+  it("counts ready and waiting pull requests", () => {
+    const items = [
+      readyPr({ id: "a", number: 1 }),
+      makePr({ id: "b", number: 2 }),
+      readyPr({ id: "c", number: 3 }),
+    ].map((pr) => toSummary(pr, { lastSeenAt: null, reviewRequestedFromMe: false }));
+    expect(countMergeReadiness(items)).toEqual({ ready: 2, waiting: 1 });
+  });
+
+  it("surfaces ready pull requests above waiting ones in the attention sort", () => {
+    const ready = toSummary(readyPr({ id: "ready", number: 1 }), {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+    });
+    const waiting = toSummary(makePr({ id: "waiting", number: 2 }), {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+    });
+    expect(sortForAttention([waiting, ready])[0]?.number).toBe(1);
   });
 });
 
