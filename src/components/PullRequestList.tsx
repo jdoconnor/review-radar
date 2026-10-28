@@ -58,18 +58,16 @@ export function PullRequestList({
         : { ...filters, onlyDirect: false, onlyTeam: false },
     [filters, kind],
   );
-  const effectiveSort = sort === "default" ? (kind === "review" ? "oldest" : "attention") : sort;
-
   const visible = useMemo(() => {
     const filtered = filterSummaries(items, effectiveFilters);
-    if (effectiveSort === "oldest") {
+    if (sort === "oldest") {
       return [...filtered].sort((l, r) => Date.parse(l.createdAt) - Date.parse(r.createdAt));
     }
-    if (effectiveSort === "newest") {
+    if (sort === "newest") {
       return [...filtered].sort((l, r) => Date.parse(r.updatedAt) - Date.parse(l.updatedAt));
     }
     return sortForAttention(filtered);
-  }, [items, effectiveFilters, effectiveSort]);
+  }, [items, effectiveFilters, sort]);
 
   const readinessCounts = useMemo(() => countMergeReadiness(visible), [visible]);
 

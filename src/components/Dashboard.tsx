@@ -9,7 +9,7 @@ import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
 import { loadFilterDefaults, saveFilterDefaults } from "../lib/filterDefaults";
-import { EMPTY_FILTERS, ListToolbar } from "./ListToolbar";
+import { DEFAULT_SORT, EMPTY_FILTERS, isSortOrder, ListToolbar } from "./ListToolbar";
 import type { Filters, SortOrder } from "./ListToolbar";
 import { PullRequestList } from "./PullRequestList";
 import { ThemeToggle } from "./ThemeToggle";
@@ -30,7 +30,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [documentHidden, setDocumentHidden] = useState(typeof document === "undefined" ? true : document.hidden);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [sort, setSort] = useState<SortOrder>("default");
+  const [sort, setSort] = useState<SortOrder>(DEFAULT_SORT[settings.defaultTab]);
   const searchRef = useRef<HTMLInputElement>(null);
   const wide = useMediaQuery("(min-width: 68.75em)");
 
@@ -48,7 +48,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       if (!hash || !hash.startsWith("#/")) {
         setFilters(base);
         setTab(settings.defaultTab);
-        setSort("default");
+        setSort(DEFAULT_SORT[settings.defaultTab]);
         return;
       }
       const parts = hash.slice(2).split("/"); // strip "#/" prefix
@@ -59,8 +59,14 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
         if (idx > 0) lookup[part.slice(0, idx)] = part.slice(idx + 1);
       });
       const mergedFilters: Filters = { ...base };
-      if (lookup.t) setTab(lookup.t === "mine" ? "mine" : "review");
-      if (lookup.s) setSort(lookup.s as SortOrder);
+      const nextTab = lookup.t === "mine" ? "mine" : lookup.t ? "review" : settings.defaultTab;
+      if (lookup.t) setTab(nextTab);
+      if (lookup.s && isSortOrder(lookup.s)) {
+        setSort(lookup.s);
+      } else {
+        // Old links stored s:default; fall back to the queue's real default.
+        setSort(DEFAULT_SORT[nextTab]);
+      }
       if (lookup.q !== undefined) mergedFilters.text = lookup.q;
       if (lookup.r !== undefined) mergedFilters.repo = lookup.r;
       if (lookup.f) {
