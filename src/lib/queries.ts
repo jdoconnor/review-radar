@@ -27,6 +27,14 @@ const PR_FIELDS = `
       }
     }
   }
+  stack {
+    number
+    size
+    baseRefName
+  }
+  stackEntry {
+    position
+  }
   reviews(last: 50) {
     nodes { id state submittedAt author { login } }
   }

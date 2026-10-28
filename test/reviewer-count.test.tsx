@@ -125,6 +125,7 @@ describe("reviewer count on my pull requests", () => {
     expect(one).toHaveTextContent("1 reviewer");
     expect(one).toHaveAttribute("title", "1 reviewer requested: @alice");
     expect(one).toHaveAttribute("data-count", "1");
+    expect(one.querySelector("svg")).not.toBeNull();
 
     const two = within(rowFor("Two reviewers listed")).getByTestId("reviewers-pill");
     expect(two).toHaveTextContent("2 reviewers");
@@ -133,18 +134,20 @@ describe("reviewer count on my pull requests", () => {
     expect(two).toHaveAttribute("data-reviewer-state", "requested");
   });
 
-  it("calls out a pull request with no reviewers", async () => {
+  it("shrinks a pull request with no reviewers into an icon and a zero", async () => {
     render(<App />);
     await screen.findByText("No reviewers yet");
 
     const pill = within(rowFor("No reviewers yet")).getByTestId("reviewers-pill");
-    expect(pill).toHaveTextContent("No reviewers");
+    expect(pill).toHaveTextContent("0");
+    expect(pill).not.toHaveTextContent("No reviewers");
+    expect(pill.querySelector("svg")).not.toBeNull();
     expect(pill).toHaveAttribute("data-count", "0");
     expect(pill).toHaveAttribute("data-reviewer-state", "none");
     expect(pill).toHaveClass("missing");
     expect(pill).toHaveAttribute(
       "title",
-      "No reviewers requested. Add a reviewer on GitHub if you meant to.",
+      "0 reviewers requested. Add a reviewer on GitHub if you meant to.",
     );
   });
 

@@ -141,6 +141,25 @@ export function directReviewRequest(pr: PullRequestNode, viewerLogin?: string | 
   });
 }
 
+/**
+ * Native stack membership from GitHub. A non-null `stack` is the signal that the
+ * pull request is part of a stack; `stackEntry.position` is optional because a
+ * permission-limited response can omit it.
+ */
+export function stackMembership(
+  pr: Pick<PullRequestNode, "stack" | "stackEntry">,
+): PullRequestSummary["stack"] {
+  const stack = pr.stack;
+  if (!stack) return null;
+  const position = pr.stackEntry?.position;
+  return {
+    number: typeof stack.number === "number" ? stack.number : 0,
+    size: typeof stack.size === "number" ? stack.size : 0,
+    baseRefName: typeof stack.baseRefName === "string" ? stack.baseRefName : "",
+    position: typeof position === "number" && position > 0 ? position : null,
+  };
+}
+
 const MERGE_BLOCKER_LABELS: Record<MergeBlocker, string> = {
   draft: "Draft",
   conflicts: "Merge conflicts",
@@ -280,6 +299,7 @@ export function toSummary(
     pendingReviewRequests,
     requestedReviewers: requestedReviewers(pr),
     reviewersKnown,
+    stack: stackMembership(pr),
     teamReviewRequests: teamReviewRequests(pr),
     approvals: approvals.length,
     approvedByViewer,
