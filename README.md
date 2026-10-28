@@ -24,6 +24,8 @@ Walking skeleton on `main`:
 - GraphQL search for review requests and authored PRs
 - IndexedDB cache with ETag support, stale-while-revalidate and pruning
 - approval / changes-requested / CI / conflict / new-activity derivations
+- stack awareness: a PR whose base is not `main` or `staging` is a stack even
+  without native GitHub stack metadata, and a stack is never "ready to merge"
 - filters, sorting, keyboard navigation (`j`/`k`/`o`/`m`/`r`/`/`)
 - light and dark themes, defaulting to the system preference
 - error, rate-limit, offline, cached and empty states

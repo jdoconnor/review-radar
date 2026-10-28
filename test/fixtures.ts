@@ -15,6 +15,7 @@ export function makePr(overrides: Partial<PullRequestNode> = {}): PullRequestNod
     changedFiles: 6,
     mergeable: "MERGEABLE",
     reviewDecision: "REVIEW_REQUIRED",
+    baseRefName: "main",
     repository: { nameWithOwner: "jdoconnor/review-radar" },
     author: { login: "jdoconnor", avatarUrl: "https://example.com/avatar.png" },
     labels: { nodes: [{ name: "feature", color: "6ea8fe" }] },

@@ -35,6 +35,7 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
       data-pr-key={pr.key}
       data-readiness={kind === "mine" ? pr.readiness.state : undefined}
       data-in-stack={pr.stack ? "true" : "false"}
+      data-base-ref={pr.baseRefName || undefined}
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}

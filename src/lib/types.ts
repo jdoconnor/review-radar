@@ -62,6 +62,12 @@ export interface StackMembership {
   baseRefName: string;
   /** Null when GitHub did not return `stackEntry` for the pull request. */
   position: number | null;
+  /**
+   * True when the pull request was not reported as a native GitHub stack, but
+   * its base branch is another branch (not `main` or `staging`), so it is
+   * effectively stacked anyway.
+   */
+  inferred?: boolean;
 }
 
 export interface CheckContextNode {
@@ -86,6 +92,8 @@ export interface PullRequestNode {
   changedFiles: number;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+  /** Branch the pull request would merge into. */
+  baseRefName?: string;
   repository: { nameWithOwner: string };
   author: { login: string; avatarUrl: string } | null;
   labels: { nodes: LabelNode[] } | null;
@@ -122,7 +130,8 @@ export type MergeBlocker =
   | "ci-running"
   | "review-required"
   | "reviewers-requested"
-  | "mergeability-unknown";
+  | "mergeability-unknown"
+  | "stacked";
 
 export interface MergeReadiness {
   state: "ready" | "waiting";
@@ -149,6 +158,8 @@ export interface PullRequestSummary {
   changedFiles: number;
   mergeable: PullRequestNode["mergeable"];
   reviewDecision: PullRequestNode["reviewDecision"];
+  /** Branch the pull request would merge into; empty when GitHub omitted it. */
+  baseRefName: string;
   labels: LabelNode[];
   reviewRequestedFromMe: boolean;
   /** A `User` reviewer in `reviewRequests` is the viewer. */
@@ -158,7 +169,11 @@ export interface PullRequestSummary {
   requestedReviewers: string[];
   /** False when GitHub omitted `reviewRequests`, for example on a permission error. */
   reviewersKnown: boolean;
-  /** Native stack membership, or null for a standalone pull request. */
+  /**
+   * Stack membership: GitHub's native stack when present, otherwise inferred
+   * from a base branch that is not `main` or `staging`. Null when the pull
+   * request merges straight into a stable branch.
+   */
   stack: StackMembership | null;
   teamReviewRequests: string[];
   approvals: number;
