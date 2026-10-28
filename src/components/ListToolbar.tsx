@@ -11,7 +11,17 @@ export interface Filters {
   onlyReady: boolean;
 }
 
-export type SortOrder = "default" | "attention" | "oldest" | "newest";
+export type SortOrder = "attention" | "oldest" | "newest";
+
+/** The order each queue opens with before the user picks one. */
+export const DEFAULT_SORT: Record<"review" | "mine", SortOrder> = {
+  review: "oldest",
+  mine: "attention",
+};
+
+export function isSortOrder(value: string): value is SortOrder {
+  return value === "attention" || value === "oldest" || value === "newest";
+}
 
 export const EMPTY_FILTERS: Filters = {
   text: "",
@@ -97,13 +107,12 @@ export function ListToolbar({
         value={sort}
         onChange={(event) => onSortChange(event.target.value as SortOrder)}
         aria-label="Sort pull requests"
-        title="Oldest first for review requests; needs attention for your pull requests"
+        title="Oldest first puts the longest-waiting review requests on top; Needs attention puts blocked and failing pull requests on top"
         data-testid="sort"
       >
-        <option value="default">Default order</option>
+        <option value="attention">Needs attention</option>
         <option value="oldest">Oldest first</option>
         <option value="newest">Recently updated</option>
-        <option value="attention">Needs attention</option>
       </select>
       {view !== "mine" ? (
         <div className="chips" role="group" aria-label="Review request filters">
