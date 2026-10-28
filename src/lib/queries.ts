@@ -14,6 +14,7 @@ const PR_FIELDS = `
   changedFiles
   mergeable
   reviewDecision
+  baseRefName
   repository { nameWithOwner }
   author { login avatarUrl }
   labels(first: 20) { nodes { name color } }

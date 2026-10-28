@@ -129,4 +129,24 @@ describe("stackMembership", () => {
       position: null,
     });
   });
+
+  it("infers a stack when the base is not main or staging", () => {
+    expect(stackMembership(makePr({ stack: null, baseRefName: "feat/parent" }))).toEqual({
+      number: 0,
+      size: 0,
+      baseRefName: "feat/parent",
+      position: null,
+      inferred: true,
+    });
+  });
+
+  it("does not call main or staging a stack", () => {
+    expect(stackMembership(makePr({ stack: null, baseRefName: "main" }))).toBeNull();
+    expect(stackMembership(makePr({ stack: null, baseRefName: "staging" }))).toBeNull();
+  });
+
+  it("does not invent a stack when the base branch is unknown", () => {
+    expect(stackMembership(makePr({ stack: null, baseRefName: "" }))).toBeNull();
+    expect(stackMembership(makePr({ stack: null, baseRefName: undefined }))).toBeNull();
+  });
 });

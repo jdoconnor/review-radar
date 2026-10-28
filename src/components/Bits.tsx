@@ -335,34 +335,42 @@ export function ReviewersPill({
 }
 
 /**
- * Native GitHub stack membership. The pill says which rung of the stack the pull
- * request occupies; a standalone pull request renders nothing.
+ * Stack membership from GitHub or inferred from a base branch that is not
+ * `main` or `staging`. The pill says which rung of a native stack the pull
+ * request occupies; a pull request that merges straight to a stable branch
+ * renders nothing.
  */
 export function StackPill({ stack }: { stack: PullRequestSummary["stack"] }) {
   if (!stack) return null;
+  const inferred = stack.inferred === true;
   const hasPosition = stack.position !== null;
   const hasSize = stack.size > 0;
-  const visible =
-    hasPosition && hasSize
+  const visible = inferred
+    ? "Stack"
+    : hasPosition && hasSize
       ? `Stack ${stack.position}/${stack.size}`
       : hasSize
         ? `Stack · ${stack.size} PRs`
         : "Stack";
   const target = stack.baseRefName ? ` targeting ${stack.baseRefName}` : "";
-  const description =
-    hasPosition && hasSize
+  const description = inferred
+    ? stack.baseRefName
+      ? `Stacked on ${stack.baseRefName}, which is not main or staging.`
+      : "Stacked on another branch, not main or staging."
+    : hasPosition && hasSize
       ? `Part of a ${stack.size}-pull-request stack, position ${stack.position}${target}.`
       : hasSize
         ? `Part of a ${stack.size}-pull-request stack${target}.`
         : "Part of a pull request stack.";
   return (
     <span
-      className="pill stack"
+      className={`pill stack${inferred ? " inferred" : ""}`}
       data-testid="stack-pill"
       data-stack-number={stack.number || undefined}
       data-stack-size={hasSize ? stack.size : undefined}
       data-stack-position={stack.position ?? undefined}
       data-stack-base={stack.baseRefName || undefined}
+      data-stack-inferred={inferred ? "true" : undefined}
       role="img"
       aria-label={description}
       title={description}

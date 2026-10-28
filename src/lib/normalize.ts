@@ -142,21 +142,55 @@ export function directReviewRequest(pr: PullRequestNode, viewerLogin?: string | 
 }
 
 /**
- * Native stack membership from GitHub. A non-null `stack` is the signal that the
- * pull request is part of a stack; `stackEntry.position` is optional because a
- * permission-limited response can omit it.
+ * Branches a pull request can merge into directly. A pull request targeting
+ * anything else is stacked on another branch, whether or not GitHub reports a
+ * native stack.
+ */
+export const STABLE_BASE_BRANCHES = ["main", "staging"] as const;
+
+/** True when the base branch is `main` or `staging` (case-insensitive). */
+export function isStableBase(baseRefName?: string | null): boolean {
+  const base = (baseRefName ?? "").trim().toLowerCase();
+  if (!base) return false;
+  return (STABLE_BASE_BRANCHES as readonly string[]).includes(base);
+}
+
+/**
+ * True when the pull request targets a branch other than `main` or `staging`.
+ * An unknown base is not treated as stacked, so a permission-limited or older
+ * cached response does not invent one.
+ */
+export function isStackedBase(baseRefName?: string | null): boolean {
+  return (baseRefName ?? "").trim() !== "" && !isStableBase(baseRefName);
+}
+
+/**
+ * Stack membership from GitHub or from the base branch. GitHub's native `stack`
+ * wins; otherwise a non-stable base is an inferred stack, because that branch
+ * is another pull request's head and this one cannot merge to main yet.
+ * `stackEntry.position` is optional because a permission-limited response can
+ * omit it.
  */
 export function stackMembership(
-  pr: Pick<PullRequestNode, "stack" | "stackEntry">,
+  pr: Pick<PullRequestNode, "stack" | "stackEntry" | "baseRefName">,
 ): PullRequestSummary["stack"] {
   const stack = pr.stack;
-  if (!stack) return null;
-  const position = pr.stackEntry?.position;
+  if (stack) {
+    const position = pr.stackEntry?.position;
+    return {
+      number: typeof stack.number === "number" ? stack.number : 0,
+      size: typeof stack.size === "number" ? stack.size : 0,
+      baseRefName: typeof stack.baseRefName === "string" ? stack.baseRefName : "",
+      position: typeof position === "number" && position > 0 ? position : null,
+    };
+  }
+  if (!isStackedBase(pr.baseRefName)) return null;
   return {
-    number: typeof stack.number === "number" ? stack.number : 0,
-    size: typeof stack.size === "number" ? stack.size : 0,
-    baseRefName: typeof stack.baseRefName === "string" ? stack.baseRefName : "",
-    position: typeof position === "number" && position > 0 ? position : null,
+    number: 0,
+    size: 0,
+    baseRefName: (pr.baseRefName ?? "").trim(),
+    position: null,
+    inferred: true,
   };
 }
 
@@ -169,6 +203,7 @@ const MERGE_BLOCKER_LABELS: Record<MergeBlocker, string> = {
   "review-required": "Review required",
   "reviewers-requested": "Reviewers requested",
   "mergeability-unknown": "Mergeability unknown",
+  stacked: "Stacked",
 };
 
 type ReadinessInput = Pick<
@@ -176,12 +211,23 @@ type ReadinessInput = Pick<
   | "isDraft"
   | "mergeable"
   | "reviewDecision"
+  | "baseRefName"
   | "approvals"
   | "changesRequested"
   | "pendingReviewRequests"
   | "reviewersKnown"
   | "checks"
 >;
+
+/**
+ * A stack's blocker names the branch it is stacked on, which is more actionable
+ * than a generic "Stacked" label.
+ */
+function mergeBlockerLabel(blocker: MergeBlocker, pr: ReadinessInput): string {
+  const base = (pr.baseRefName ?? "").trim();
+  if (blocker === "stacked" && base) return `Stacked on ${base}`;
+  return MERGE_BLOCKER_LABELS[blocker];
+}
 
 /**
  * GitHub reports whether a branch is mergeable, not whether the author is still
@@ -196,6 +242,9 @@ type ReadinessInput = Pick<
 export function mergeReadiness(pr: ReadinessInput): MergeReadiness {
   const blockers: MergeBlocker[] = [];
   if (pr.isDraft) blockers.push("draft");
+  // Merging into another pull request's branch is not shipping to main. Even a
+  // green, approved stack is waiting for its base branch to land first.
+  if (isStackedBase(pr.baseRefName)) blockers.push("stacked");
   if (pr.mergeable === "CONFLICTING") blockers.push("conflicts");
   if (pr.changesRequested > 0) blockers.push("changes-requested");
   if (pr.checks.state === "failure") blockers.push("ci-failing");
@@ -209,7 +258,7 @@ export function mergeReadiness(pr: ReadinessInput): MergeReadiness {
   return {
     state: blockers.length === 0 ? "ready" : "waiting",
     blockers,
-    reasons: blockers.map((blocker) => MERGE_BLOCKER_LABELS[blocker]),
+    reasons: blockers.map((blocker) => mergeBlockerLabel(blocker, pr)),
   };
 }
 
@@ -266,10 +315,12 @@ export function toSummary(
   const checks = summarizeChecks(pr);
   const pendingReviewRequests = pr.reviewRequests?.totalCount ?? 0;
   const reviewersKnown = pr.reviewRequests != null;
+  const baseRefName = (pr.baseRefName ?? "").trim();
   const readiness = mergeReadiness({
     isDraft: pr.isDraft,
     mergeable: pr.mergeable,
     reviewDecision: pr.reviewDecision,
+    baseRefName,
     approvals: approvals.length,
     changesRequested,
     pendingReviewRequests,
@@ -293,6 +344,7 @@ export function toSummary(
     changedFiles: pr.changedFiles,
     mergeable: pr.mergeable,
     reviewDecision: pr.reviewDecision,
+    baseRefName,
     labels: pr.labels?.nodes ?? [],
     reviewRequestedFromMe: options.reviewRequestedFromMe,
     directReviewRequest: directReviewRequest(pr, viewerLogin),

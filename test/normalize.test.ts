@@ -241,6 +241,21 @@ describe("merge readiness", () => {
     expect(readinessOf(readyPr())).toEqual({ state: "ready", blockers: [], reasons: [] });
   });
 
+  it("is not ready when the base is not main or staging", () => {
+    const readiness = readinessOf(readyPr({ baseRefName: "feat/parent" }));
+    expect(readiness.state).toBe("waiting");
+    expect(readiness.blockers).toEqual(["stacked"]);
+    expect(readiness.reasons).toEqual(["Stacked on feat/parent"]);
+  });
+
+  it("stays ready for a pull request that targets staging", () => {
+    expect(readinessOf(readyPr({ baseRefName: "staging" }))).toEqual({
+      state: "ready",
+      blockers: [],
+      reasons: [],
+    });
+  });
+
   it("lists CI and review blockers in a stable order", () => {
     const readiness = readinessOf(makePr());
     expect(readiness.state).toBe("waiting");
