@@ -7,6 +7,8 @@ import type {
   PullRequestNode,
   PullRequestSummary,
   ReviewNode,
+  StackNode,
+  StackedOnNode,
 } from "./types";
 
 const FAILURE_CONCLUSIONS = new Set([
@@ -177,11 +179,15 @@ export function stackMembership(
   const stack = pr.stack;
   if (stack) {
     const position = pr.stackEntry?.position;
+    const entryPosition = typeof position === "number" && position > 0 ? position : null;
+    // The rung directly below this one is the pull request it is waiting on.
+    const stackedOn = stackedOnEntry(stack.entries?.nodes, entryPosition);
     return {
       number: typeof stack.number === "number" ? stack.number : 0,
       size: typeof stack.size === "number" ? stack.size : 0,
       baseRefName: typeof stack.baseRefName === "string" ? stack.baseRefName : "",
-      position: typeof position === "number" && position > 0 ? position : null,
+      position: entryPosition,
+      ...(stackedOn ? { stackedOn } : {}),
     };
   }
   if (!isStackedBase(pr.baseRefName)) return null;
@@ -192,6 +198,52 @@ export function stackMembership(
     position: null,
     inferred: true,
   };
+}
+
+/** The stack entry one position lower, whose pull request is this one's base. */
+function stackedOnEntry(
+  entries: NonNullable<StackNode["entries"]>["nodes"] | null | undefined,
+  position: number | null,
+): StackedOnNode | null {
+  if (position === null || position <= 1) return null;
+  for (const entry of entries ?? []) {
+    if (entry?.position !== position - 1) continue;
+    const pullRequest = entry.pullRequest;
+    if (!pullRequest) return null;
+    return { number: pullRequest.number, url: pullRequest.url };
+  }
+  return null;
+}
+
+export function pullRequestKey(pr: Pick<PullRequestNode, "number" | "repository">): string {
+  return `${pr.repository.nameWithOwner}#${pr.number}`;
+}
+
+/**
+ * Pull requests a stack is built on, keyed by the pull request above them.
+ * GitHub reports the parent only for native stacks; an inferred stack names a
+ * base branch, which is another pull request's head branch, so a pull request in
+ * the same view whose head matches is that parent. A parent that is not in the
+ * view (merged, closed, or not mine) stays unresolved rather than guessed at.
+ */
+export function stackParents(nodes: PullRequestNode[]): Map<string, StackedOnNode> {
+  const byHead = new Map<string, StackedOnNode>();
+  for (const pr of nodes) {
+    const head = (pr.headRefName ?? "").trim();
+    if (!head) continue;
+    byHead.set(`${pr.repository.nameWithOwner}#${head}`, { number: pr.number, url: pr.url });
+  }
+
+  const parents = new Map<string, StackedOnNode>();
+  for (const pr of nodes) {
+    const stack = stackMembership(pr);
+    // Native stacks carry their own entries; only inferred stacks are guessed at.
+    if (!stack?.inferred) continue;
+    const parent = byHead.get(`${pr.repository.nameWithOwner}#${stack.baseRefName}`);
+    if (!parent || parent.number === pr.number) continue;
+    parents.set(pullRequestKey(pr), parent);
+  }
+  return parents;
 }
 
 const MERGE_BLOCKER_LABELS: Record<MergeBlocker, string> = {
@@ -217,15 +269,23 @@ type ReadinessInput = Pick<
   | "pendingReviewRequests"
   | "reviewersKnown"
   | "checks"
->;
+> & {
+  /** The pull request this one is stacked on, when it is known. */
+  stackedOn?: StackedOnNode | null;
+};
 
 /**
  * A stack's blocker names the branch it is stacked on, which is more actionable
- * than a generic "Stacked" label.
+ * than a generic "Stacked" label. When the parent pull request is known, name
+ * it by number so the reason can link straight to it.
  */
 function mergeBlockerLabel(blocker: MergeBlocker, pr: ReadinessInput): string {
-  const base = (pr.baseRefName ?? "").trim();
-  if (blocker === "stacked" && base) return `Stacked on ${base}`;
+  if (blocker === "stacked") {
+    const parent = pr.stackedOn;
+    if (parent) return `Stacked on #${parent.number}`;
+    const base = (pr.baseRefName ?? "").trim();
+    if (base) return `Stacked on ${base}`;
+  }
   return MERGE_BLOCKER_LABELS[blocker];
 }
 
@@ -255,11 +315,13 @@ export function mergeReadiness(pr: ReadinessInput): MergeReadiness {
   }
   if (pr.mergeable === "UNKNOWN") blockers.push("mergeability-unknown");
 
-  return {
+  const readiness: MergeReadiness = {
     state: blockers.length === 0 ? "ready" : "waiting",
     blockers,
     reasons: blockers.map((blocker) => mergeBlockerLabel(blocker, pr)),
   };
+  if (pr.stackedOn && blockers.includes("stacked")) readiness.stackedOn = pr.stackedOn;
+  return readiness;
 }
 
 function reviewsSatisfied(pr: ReadinessInput): boolean {
@@ -298,9 +360,15 @@ function activityAfter(pr: PullRequestNode, lastSeenAt: number | null): number {
 
 export function toSummary(
   pr: PullRequestNode,
-  options: { lastSeenAt: number | null; reviewRequestedFromMe: boolean; viewerLogin?: string | null },
+  options: {
+    lastSeenAt: number | null;
+    reviewRequestedFromMe: boolean;
+    viewerLogin?: string | null;
+    /** The pull request this one is stacked on, when it could be identified. */
+    stackedOn?: StackedOnNode | null;
+  },
 ): PullRequestSummary {
-  const key = `${pr.repository.nameWithOwner}#${pr.number}`;
+  const key = pullRequestKey(pr);
   const reviews = pr.reviews?.nodes ?? [];
   const latest = latestReviews(reviews);
   const approvals = latest.filter((review) => review.state === "APPROVED");
@@ -316,6 +384,9 @@ export function toSummary(
   const pendingReviewRequests = pr.reviewRequests?.totalCount ?? 0;
   const reviewersKnown = pr.reviewRequests != null;
   const baseRefName = (pr.baseRefName ?? "").trim();
+  const stack = stackMembership(pr);
+  const stackedOn = stack?.stackedOn ?? options.stackedOn ?? null;
+  if (stack && stackedOn) stack.stackedOn = stackedOn;
   const readiness = mergeReadiness({
     isDraft: pr.isDraft,
     mergeable: pr.mergeable,
@@ -326,6 +397,7 @@ export function toSummary(
     pendingReviewRequests,
     reviewersKnown,
     checks,
+    stackedOn,
   });
   return {
     key,
@@ -351,7 +423,7 @@ export function toSummary(
     pendingReviewRequests,
     requestedReviewers: requestedReviewers(pr),
     reviewersKnown,
-    stack: stackMembership(pr),
+    stack,
     teamReviewRequests: teamReviewRequests(pr),
     approvals: approvals.length,
     approvedByViewer,

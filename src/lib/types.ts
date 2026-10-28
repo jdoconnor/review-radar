@@ -41,6 +41,12 @@ export interface ReviewerNode {
     | null;
 }
 
+/** The pull request a stacked pull request sits on, once it is identified. */
+export interface StackedOnNode {
+  number: number;
+  url: string;
+}
+
 /**
  * Native GitHub stacked pull requests. `stack` is null for a pull request that
  * stands alone; `stackEntry` carries its place in the stack.
@@ -49,11 +55,15 @@ export interface StackNode {
   number: number;
   size: number;
   baseRefName: string;
+  /** The stack's rungs, lowest first. Absent on older cached responses. */
+  entries?: { nodes: Array<StackEntryNode | null> } | null;
 }
 
 export interface StackEntryNode {
   /** 1 is closest to the stack's base branch. */
   position: number;
+  /** The pull request that occupies this position in the stack. */
+  pullRequest?: StackedOnNode | null;
 }
 
 export interface StackMembership {
@@ -68,6 +78,11 @@ export interface StackMembership {
    * effectively stacked anyway.
    */
   inferred?: boolean;
+  /**
+   * The pull request this one is stacked on, so the base branch can be a link
+   * rather than an inert branch name. Absent when it could not be identified.
+   */
+  stackedOn?: StackedOnNode | null;
 }
 
 export interface CheckContextNode {
@@ -94,6 +109,8 @@ export interface PullRequestNode {
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
   /** Branch the pull request would merge into. */
   baseRefName?: string;
+  /** Branch the pull request's commits live on, another pull request's base. */
+  headRefName?: string;
   repository: { nameWithOwner: string };
   author: { login: string; avatarUrl: string } | null;
   labels: { nodes: LabelNode[] } | null;
@@ -139,6 +156,11 @@ export interface MergeReadiness {
   blockers: MergeBlocker[];
   /** Display labels aligned with `blockers`. */
   reasons: string[];
+  /**
+   * The pull request the stack is waiting on, when it is known. Only set when
+   * `stacked` is a blocker, so a reason can point at it.
+   */
+  stackedOn?: StackedOnNode;
 }
 
 export interface PullRequestSummary {

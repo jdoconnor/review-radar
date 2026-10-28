@@ -15,6 +15,7 @@ const PR_FIELDS = `
   mergeable
   reviewDecision
   baseRefName
+  headRefName
   repository { nameWithOwner }
   author { login avatarUrl }
   labels(first: 20) { nodes { name color } }
@@ -32,6 +33,12 @@ const PR_FIELDS = `
     number
     size
     baseRefName
+    entries(first: 100) {
+      nodes {
+        position
+        pullRequest { number url }
+      }
+    }
   }
   stackEntry {
     position

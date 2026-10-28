@@ -150,3 +150,43 @@ describe("stackMembership", () => {
     expect(stackMembership(makePr({ stack: null, baseRefName: undefined }))).toBeNull();
   });
 });
+
+describe("stack membership entries", () => {
+  const pullUrl = (number: number) => `https://github.com/jdoconnor/review-radar/pull/${number}`;
+
+  const nativeStack = {
+    number: 7,
+    size: 3,
+    baseRefName: "main",
+    entries: {
+      nodes: [
+        { position: 1, pullRequest: { number: 79, url: pullUrl(79) } },
+        { position: 2, pullRequest: { number: 80, url: pullUrl(80) } },
+      ],
+    },
+  };
+
+  it("names the pull request one rung below it in a native stack", () => {
+    expect(stackMembership(makePr({ stack: nativeStack, stackEntry: { position: 2 } }))).toMatchObject({
+      position: 2,
+      stackedOn: { number: 79, url: pullUrl(79) },
+    });
+  });
+
+  it("has no parent when it sits directly on the stack's base branch", () => {
+    expect(stackMembership(makePr({ stack: nativeStack, stackEntry: { position: 1 } }))).toEqual({
+      number: 7,
+      size: 3,
+      baseRefName: "main",
+      position: 1,
+    });
+  });
+
+  it("stays link-free when GitHub omits the entries", () => {
+    expect(
+      stackMembership(
+        makePr({ stack: { number: 7, size: 3, baseRefName: "main" }, stackEntry: { position: 2 } }),
+      ),
+    ).toEqual({ number: 7, size: 3, baseRefName: "main", position: 2 });
+  });
+});

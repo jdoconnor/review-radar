@@ -586,6 +586,29 @@ select:focus {
   background: var(--amber);
 }
 
+/*
+ * The stack reason points at the pull request it is waiting on. Underline by
+ * default so it reads as a link without relying on color alone, and thicken it
+ * on hover and focus.
+ */
+.pill.readiness .reason-link {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-decoration-thickness: 0.0625rem;
+  text-underline-offset: 0.1875rem;
+  border-radius: 0.25rem;
+}
+
+.pill.readiness .reason-link:hover,
+.pill.readiness .reason-link:focus-visible {
+  text-decoration-thickness: 0.125rem;
+}
+
+.pill.readiness .reason-link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .merge-summary {
   display: flex;
   flex-wrap: wrap;
