@@ -6,6 +6,7 @@ import {
   filterSummaries,
   latestReviews,
   sortForAttention,
+  stackParents,
   summarizeChecks,
   toSummary,
 } from "../src/lib/normalize";
@@ -246,6 +247,19 @@ describe("merge readiness", () => {
     expect(readiness.state).toBe("waiting");
     expect(readiness.blockers).toEqual(["stacked"]);
     expect(readiness.reasons).toEqual(["Stacked on feat/parent"]);
+    expect(readiness.stackedOn).toBeUndefined();
+  });
+
+  it("names and points at the pull request a stack waits on", () => {
+    const parent = { number: 79, url: "https://github.com/jdoconnor/review-radar/pull/79" };
+    const readiness = toSummary(readyPr({ baseRefName: "feat/parent" }), {
+      lastSeenAt: null,
+      reviewRequestedFromMe: false,
+      stackedOn: parent,
+    }).readiness;
+    expect(readiness.blockers).toEqual(["stacked"]);
+    expect(readiness.reasons).toEqual(["Stacked on #79"]);
+    expect(readiness.stackedOn).toEqual(parent);
   });
 
   it("stays ready for a pull request that targets staging", () => {
@@ -355,6 +369,53 @@ describe("merge readiness", () => {
       reviewRequestedFromMe: false,
     });
     expect(sortForAttention([waiting, ready])[0]?.number).toBe(1);
+  });
+});
+
+describe("stackParents", () => {
+  const pullUrl = (number: number) => `https://github.com/jdoconnor/review-radar/pull/${number}`;
+
+  it("points an inferred stack at the pull request whose head is its base", () => {
+    const parent = makePr({
+      id: "parent",
+      number: 79,
+      url: pullUrl(79),
+      headRefName: "feat/parent",
+      baseRefName: "main",
+    });
+    const child = makePr({ id: "child", number: 80, headRefName: "feat/child", baseRefName: "feat/parent" });
+
+    expect(stackParents([parent, child])).toEqual(
+      new Map([["jdoconnor/review-radar#80", { number: 79, url: pullUrl(79) }]]),
+    );
+  });
+
+  it("resolves nothing when the parent is not in the loaded view", () => {
+    const child = makePr({ id: "child", number: 80, headRefName: "feat/child", baseRefName: "feat/parent" });
+    expect(stackParents([child]).size).toBe(0);
+  });
+
+  it("does not match a head branch in another repository", () => {
+    const parent = makePr({
+      id: "parent",
+      number: 79,
+      headRefName: "feat/parent",
+      repository: { nameWithOwner: "someone/else" },
+    });
+    const child = makePr({ id: "child", number: 80, headRefName: "feat/child", baseRefName: "feat/parent" });
+    expect(stackParents([parent, child]).size).toBe(0);
+  });
+
+  it("leaves native stacks to GitHub's own entries", () => {
+    const other = makePr({ id: "other", number: 79, headRefName: "feat/parent" });
+    const child = makePr({
+      id: "child",
+      number: 80,
+      baseRefName: "feat/parent",
+      stack: { number: 3, size: 2, baseRefName: "main" },
+      stackEntry: { position: 2 },
+    });
+    expect(stackParents([other, child]).size).toBe(0);
   });
 });
 

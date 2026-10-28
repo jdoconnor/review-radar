@@ -385,11 +385,15 @@ export function StackPill({ stack }: { stack: PullRequestSummary["stack"] }) {
  * One-glance answer for an authored PR: green when nothing is left to wait on,
  * otherwise the headline blocker. The complete list is in the tooltip so a row
  * never hides *why* it is waiting.
+ *
+ * When the headline blocker is a stack and the pull request it waits on is
+ * known, that message is a link to it, so getting to the base PR is one click.
  */
 export function MergeReadinessPill({ readiness }: { readiness: MergeReadiness }) {
   const ready = readiness.state === "ready";
   const reasons = readiness.reasons;
-  const label = ready ? "Ready to merge" : `Waiting: ${reasons[0] ?? "something"}`;
+  const headline = reasons[0] ?? "something";
+  const stackedOn = readiness.blockers[0] === "stacked" ? readiness.stackedOn : undefined;
   const description = ready
     ? "Ready to merge: no conflicts, no failing checks, and no review outstanding."
     : `Waiting on ${reasons.join(", ")}.`;
@@ -402,7 +406,29 @@ export function MergeReadinessPill({ readiness }: { readiness: MergeReadiness })
       title={description}
     >
       <span className="readiness-dot" aria-hidden="true" />
-      {label}
+      {ready ? (
+        "Ready to merge"
+      ) : (
+        <>
+          Waiting:{" "}
+          {stackedOn ? (
+            <a
+              className="reason-link"
+              href={stackedOn.url}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="stacked-on-link"
+              data-stacked-on={stackedOn.number}
+              title={`Open pull request #${stackedOn.number}`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              {headline}
+            </a>
+          ) : (
+            headline
+          )}
+        </>
+      )}
     </span>
   );
 }

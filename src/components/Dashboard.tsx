@@ -4,7 +4,13 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
-import { countMergeReadiness, toSummary, relativeTime } from "../lib/normalize";
+import {
+  countMergeReadiness,
+  pullRequestKey,
+  stackParents,
+  toSummary,
+  relativeTime,
+} from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
@@ -150,20 +156,30 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const reviewItems = useMemo(() => {
     void seenVersion;
     if (!reviewQuery.data) return [];
-    return pullRequests(reviewQuery.data).map((pr) =>
-      toSummary(pr, { lastSeenAt: null, reviewRequestedFromMe: true, viewerLogin }),
+    const nodes = pullRequests(reviewQuery.data);
+    const parents = stackParents(nodes);
+    return nodes.map((pr) =>
+      toSummary(pr, {
+        lastSeenAt: null,
+        reviewRequestedFromMe: true,
+        viewerLogin,
+        stackedOn: parents.get(pullRequestKey(pr)) ?? null,
+      }),
     );
   }, [reviewQuery.data, seenVersion, viewerLogin]);
 
   const mineItems = useMemo(() => {
     void seenVersion;
     if (!mineQuery.data) return [];
-    return pullRequests(mineQuery.data).map((pr) => {
-      const key = `${pr.repository.nameWithOwner}#${pr.number}`;
+    const nodes = pullRequests(mineQuery.data);
+    const parents = stackParents(nodes);
+    return nodes.map((pr) => {
+      const key = pullRequestKey(pr);
       return toSummary(pr, {
         lastSeenAt: lastSeenFor(key),
         reviewRequestedFromMe: false,
         viewerLogin,
+        stackedOn: parents.get(key) ?? null,
       });
     });
   }, [mineQuery.data, seenVersion, viewerLogin]);
