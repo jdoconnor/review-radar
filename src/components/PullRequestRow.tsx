@@ -12,6 +12,7 @@ import {
   MergeReadinessPill,
   NewActivityPill,
   ReviewersPill,
+  StackPill,
   TeamReviewPill,
 } from "./Bits";
 
@@ -33,6 +34,7 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
       data-testid="pr-row"
       data-pr-key={pr.key}
       data-readiness={kind === "mine" ? pr.readiness.state : undefined}
+      data-in-stack={pr.stack ? "true" : "false"}
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
@@ -83,20 +85,21 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
       <div className="pr-status">
         {kind === "mine" ? <MergeReadinessPill readiness={pr.readiness} /> : null}
         {pr.isDraft ? <DraftPill /> : null}
+        <StackPill stack={pr.stack} />
         {kind === "review" && pr.directReviewRequest ? (
           <DirectReviewPill viewer={viewerLogin} />
         ) : null}
         <TeamReviewPill teams={pr.teamReviewRequests} />
-        {kind === "mine" ? (
-          <ReviewersPill
-            count={pr.pendingReviewRequests}
-            names={pr.requestedReviewers}
-            known={pr.reviewersKnown}
-          />
-        ) : null}
         <ChangesPill count={pr.changesRequested} />
         <NewActivityPill count={pr.newActivity} />
         <span className="status-icons" data-testid="status-icons">
+          {kind === "mine" ? (
+            <ReviewersPill
+              count={pr.pendingReviewRequests}
+              names={pr.requestedReviewers}
+              known={pr.reviewersKnown}
+            />
+          ) : null}
           <ApprovalStatus pr={pr} />
           <ConflictStatus conflicting={pr.mergeable === "CONFLICTING"} />
           <CheckStatus state={pr.checks.state} failing={pr.checks.failing} total={pr.checks.total} />

@@ -39,6 +39,8 @@ function StatusIcon({
   className = "",
   count,
   dataApproval,
+  dataCount,
+  dataReviewerState,
 }: {
   children: ReactNode;
   label: string;
@@ -46,12 +48,16 @@ function StatusIcon({
   className?: string;
   count?: number;
   dataApproval?: "viewer" | "others" | "unknown" | "none";
+  dataCount?: number;
+  dataReviewerState?: "none" | "requested";
 }) {
   return (
     <span
       className={`status-icon ${className}`.trim()}
       data-testid={testId}
       data-approval={dataApproval}
+      data-count={dataCount}
+      data-reviewer-state={dataReviewerState}
       role="img"
       aria-label={label}
       title={label}
@@ -120,6 +126,49 @@ function CommentGlyph() {
         d="M2.25 3.25h11.5v7.5H7l-3.25 2.5v-2.5h-1.5v-7.5Z"
         stroke="currentColor"
         strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ReviewerGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <circle cx="6" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.3" />
+      <path
+        d="M1.75 13.25c0-2.1 1.9-3.75 4.25-3.75s4.25 1.65 4.25 3.75"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path d="M12.25 3.25v4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M10.25 5.25h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function StackGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <path
+        d="M8 1.75 14 5 8 8.25 2 5l6-3.25Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m2.75 8 5.25 2.85L13.25 8"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m2.75 11 5.25 2.85L13.25 11"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
         strokeLinejoin="round"
       />
     </svg>
@@ -249,8 +298,10 @@ export function TeamReviewPill({ teams }: { teams: string[] }) {
 }
 
 /**
- * How many reviewers are already requested on an authored PR. Zero is called
- * out rather than hidden, because that is the case a user wants to notice.
+ * How many reviewers are already requested on an authored PR. It shares the
+ * icon-and-count shape of the other row statuses so a zero still reads at a
+ * glance without a text pill taking over the row. Zero stays called out in amber
+ * because that is the case a user wants to notice.
  */
 export function ReviewersPill({
   count,
@@ -265,19 +316,59 @@ export function ReviewersPill({
   const noun = count === 1 ? "reviewer" : "reviewers";
   const listed = names.slice(0, 5).join(", ");
   const more = count > names.length ? `${listed ? ", " : ""}${count - names.length} more` : "";
-  const title =
+  const label =
     count === 0
-      ? "No reviewers requested. Add a reviewer on GitHub if you meant to."
+      ? "0 reviewers requested. Add a reviewer on GitHub if you meant to."
       : `${count} ${noun} requested${listed ? `: ${listed}${more}` : ""}`;
   return (
-    <span
-      className={`pill reviewers${count === 0 ? " missing" : ""}`}
-      data-testid="reviewers-pill"
-      data-count={count}
-      data-reviewer-state={count === 0 ? "none" : "requested"}
-      title={title}
+    <StatusIcon
+      label={label}
+      testId="reviewers-pill"
+      className={`reviewers${count === 0 ? " missing" : ""}`}
+      count={count}
+      dataCount={count}
+      dataReviewerState={count === 0 ? "none" : "requested"}
     >
-      {count === 0 ? "No reviewers" : `${count} ${noun}`}
+      <ReviewerGlyph />
+    </StatusIcon>
+  );
+}
+
+/**
+ * Native GitHub stack membership. The pill says which rung of the stack the pull
+ * request occupies; a standalone pull request renders nothing.
+ */
+export function StackPill({ stack }: { stack: PullRequestSummary["stack"] }) {
+  if (!stack) return null;
+  const hasPosition = stack.position !== null;
+  const hasSize = stack.size > 0;
+  const visible =
+    hasPosition && hasSize
+      ? `Stack ${stack.position}/${stack.size}`
+      : hasSize
+        ? `Stack · ${stack.size} PRs`
+        : "Stack";
+  const target = stack.baseRefName ? ` targeting ${stack.baseRefName}` : "";
+  const description =
+    hasPosition && hasSize
+      ? `Part of a ${stack.size}-pull-request stack, position ${stack.position}${target}.`
+      : hasSize
+        ? `Part of a ${stack.size}-pull-request stack${target}.`
+        : "Part of a pull request stack.";
+  return (
+    <span
+      className="pill stack"
+      data-testid="stack-pill"
+      data-stack-number={stack.number || undefined}
+      data-stack-size={hasSize ? stack.size : undefined}
+      data-stack-position={stack.position ?? undefined}
+      data-stack-base={stack.baseRefName || undefined}
+      role="img"
+      aria-label={description}
+      title={description}
+    >
+      <StackGlyph />
+      <span aria-hidden="true">{visible}</span>
     </span>
   );
 }

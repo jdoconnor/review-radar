@@ -201,7 +201,8 @@ function permissionsFor(errors: GraphQLErrorShape[]): PermissionKey[] {
       path.includes("reviewRequests") ||
       path.includes("reviews") ||
       path.includes("reviewDecision") ||
-      path.includes("mergeable")
+      path.includes("mergeable") ||
+      path.includes("stack")
     ) {
       found.add("pullRequests");
     }

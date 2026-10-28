@@ -687,11 +687,22 @@ select:focus {
   font-variant-numeric: tabular-nums;
 }
 
-.reviewers.missing {
-  border-color: var(--amber-border);
-  background: var(--amber-soft);
+/* A count of zero is the actionable case, so it keeps the amber callout. */
+.status-icon.reviewers.missing {
   color: var(--amber);
   font-weight: 650;
+}
+
+.pill.stack {
+  gap: 0.35em;
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+
+.pill.stack svg {
+  width: 1em;
+  height: 1em;
+  flex: none;
 }
 
 .offline {

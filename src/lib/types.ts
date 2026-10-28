@@ -41,6 +41,29 @@ export interface ReviewerNode {
     | null;
 }
 
+/**
+ * Native GitHub stacked pull requests. `stack` is null for a pull request that
+ * stands alone; `stackEntry` carries its place in the stack.
+ */
+export interface StackNode {
+  number: number;
+  size: number;
+  baseRefName: string;
+}
+
+export interface StackEntryNode {
+  /** 1 is closest to the stack's base branch. */
+  position: number;
+}
+
+export interface StackMembership {
+  number: number;
+  size: number;
+  baseRefName: string;
+  /** Null when GitHub did not return `stackEntry` for the pull request. */
+  position: number | null;
+}
+
 export interface CheckContextNode {
   __typename: "CheckRun" | "StatusContext";
   name?: string;
@@ -67,6 +90,9 @@ export interface PullRequestNode {
   author: { login: string; avatarUrl: string } | null;
   labels: { nodes: LabelNode[] } | null;
   reviewRequests: { totalCount: number; nodes: ReviewerNode[] } | null;
+  /** Null or absent when the pull request is not part of a native stack. */
+  stack?: StackNode | null;
+  stackEntry?: StackEntryNode | null;
   reviews: { nodes: ReviewNode[] } | null;
   comments: { totalCount: number; nodes: CommentNode[] } | null;
   commits: {
@@ -132,6 +158,8 @@ export interface PullRequestSummary {
   requestedReviewers: string[];
   /** False when GitHub omitted `reviewRequests`, for example on a permission error. */
   reviewersKnown: boolean;
+  /** Native stack membership, or null for a standalone pull request. */
+  stack: StackMembership | null;
   teamReviewRequests: string[];
   approvals: number;
   approvedByViewer: boolean;
