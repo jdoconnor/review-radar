@@ -500,6 +500,26 @@ export function relativeTime(iso: string, now = Date.now()): string {
   return formatter.format(Math.round(seconds / 31_536_000), "year");
 }
 
+/**
+ * Viewer-local clock time for a timestamp. Today's timestamps show just the
+ * time; older ones include the date so a cached screen cannot mislead.
+ */
+export function clockTime(ms: number, now = Date.now()): string {
+  if (!Number.isFinite(ms)) return "";
+  const then = new Date(ms);
+  if (!Number.isFinite(then.getTime())) return "";
+  const today = new Date(now);
+  const sameDay =
+    then.getFullYear() === today.getFullYear() &&
+    then.getMonth() === today.getMonth() &&
+    then.getDate() === today.getDate();
+  return then.toLocaleString(undefined, {
+    ...(sameDay ? {} : { month: "short", day: "numeric" }),
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function checkLabel(state: CheckState): string {
   switch (state) {
     case "success":

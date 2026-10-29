@@ -9,6 +9,7 @@ import {
   stackParents,
   summarizeChecks,
   toSummary,
+  clockTime,
 } from "../src/lib/normalize";
 import type { PullRequestNode } from "../src/lib/types";
 import { makePr } from "./fixtures";
@@ -605,5 +606,35 @@ describe("reviewer count", () => {
     });
     expect(unknown.pendingReviewRequests).toBe(0);
     expect(unknown.reviewersKnown).toBe(false);
+  });
+});
+
+describe("clockTime", () => {
+  it("shows only the viewer's local time for today", () => {
+    const now = new Date(2026, 9, 29, 15, 30).getTime();
+    const thisMorning = new Date(2026, 9, 29, 9, 5).getTime();
+    const label = clockTime(thisMorning, now);
+    expect(label).toBe(
+      new Date(thisMorning).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+    );
+    expect(label).not.toMatch(/Oct/);
+  });
+
+  it("includes the date when the data is not from today", () => {
+    const now = new Date(2026, 9, 29, 15, 30).getTime();
+    const yesterday = new Date(2026, 9, 28, 22, 10).getTime();
+    expect(clockTime(yesterday, now)).toBe(
+      new Date(yesterday).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+    );
+    expect(clockTime(yesterday, now)).toMatch(/Oct/);
+  });
+
+  it("returns an empty label for an invalid timestamp", () => {
+    expect(clockTime(Number.NaN)).toBe("");
   });
 });

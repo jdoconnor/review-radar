@@ -9,7 +9,7 @@ import {
   pullRequestKey,
   stackParents,
   toSummary,
-  relativeTime,
+  clockTime,
 } from "../lib/normalize";
 import type { SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
@@ -336,11 +336,19 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     />
   );
 
-  // Compute the "updated <relative time>" label for the active view
+  // Compute the "updated <local time>" label for the active view.
   const updatedLabel = useMemo(() => {
     if (!activeLastUpdated) return null;
-    return `updated ${relativeTime(activeLastUpdated.toString())}`;
+    const time = clockTime(activeLastUpdated);
+    return time ? `updated ${time}` : null;
   }, [activeLastUpdated]);
+  const updatedTitle = useMemo(
+    () =>
+      activeLastUpdated
+        ? `Data last updated ${new Date(activeLastUpdated).toLocaleString()}`
+        : "Data last updated",
+    [activeLastUpdated],
+  );
 
   return (
     <div className="app-shell">
@@ -409,9 +417,13 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
               {rateLimit.remaining.toLocaleString()}/{rateLimit.limit.toLocaleString()}
             </span>
           ) : null}
-          {/* Show "updated <relative time>" for active view */}
+          {/* Show the local clock time of the active view's last refresh */}
           {updatedLabel && (
-            <span className="pill" data-testid="updated-indicator" title="Data last updated">
+            <span
+              className="pill"
+              data-testid="updated-indicator"
+              title={updatedTitle}
+            >
               {updatedLabel}
             </span>
           )}
