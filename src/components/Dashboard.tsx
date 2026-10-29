@@ -28,6 +28,20 @@ interface Props {
   onSignOut: () => void;
 }
 
+/** Keep text and repo filters from splitting on the hash's "/" and ":" separators. */
+function encodeHashPart(value: string): string {
+  return encodeURIComponent(value);
+}
+
+function decodeHashPart(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    // A hand-edited or legacy hash can hold a stray "%"; show it verbatim.
+    return value;
+  }
+}
+
 export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut }: Props) {
   const [tab, setTab] = useState<Settings["defaultTab"]>(settings.defaultTab);
   const [seenVersion, setSeenVersion] = useState(0);
@@ -37,6 +51,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [documentHidden, setDocumentHidden] = useState(typeof document === "undefined" ? true : document.hidden);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortOrder>(DEFAULT_SORT[settings.defaultTab]);
+  const [hydrated, setHydrated] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const wide = useMediaQuery("(min-width: 68.75em)");
 
@@ -45,20 +60,32 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   // Filter defaults are loaded from IndexedDB, then URL overrides are applied.
   // Effects are guarded with typeof window to avoid issues in test environments
   // (jsdom) where window.location may not behave like a browser.
+  //
+  // Nothing may be written until this read finishes. The first render still
+  // holds the defaults, so an eager write would replace the saved hash with
+  // "oldest" (the review queue default) before it could be read back.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      setHydrated(true);
+      return;
+    }
+    let cancelled = false;
     void (async () => {
       const defaults = await loadFilterDefaults();
+      if (cancelled) return;
       const base = defaults ?? EMPTY_FILTERS;
-      const hash = window.location.hash;
-      if (!hash || !hash.startsWith("#/")) {
+      // Accept both "#/t:mine/..." (current) and "#t:mine/..." (written by
+      // earlier versions, which forgot the slash and so could never read it).
+      const raw = window.location.hash.replace(/^#\/?/, "");
+      if (!raw) {
         setFilters(base);
         setTab(settings.defaultTab);
         setSort(DEFAULT_SORT[settings.defaultTab]);
+        setHydrated(true);
         return;
       }
-      const parts = hash.slice(2).split("/"); // strip "#/" prefix
-      // Expected format: t:mine/q:review/s:attention/f:true,c:true,n:false
+      const parts = raw.split("/");
+      // Expected format: t:mine/q:review/s:attention/r:owner%2Frepo/f:failing,new
       const lookup: Record<string, string> = {};
       parts.forEach((part) => {
         const idx = part.indexOf(":");
@@ -66,51 +93,74 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       });
       const mergedFilters: Filters = { ...base };
       const nextTab = lookup.t === "mine" ? "mine" : lookup.t ? "review" : settings.defaultTab;
-      if (lookup.t) setTab(nextTab);
+      setTab(nextTab);
       if (lookup.s && isSortOrder(lookup.s)) {
         setSort(lookup.s);
       } else {
         // Old links stored s:default; fall back to the queue's real default.
         setSort(DEFAULT_SORT[nextTab]);
       }
-      if (lookup.q !== undefined) mergedFilters.text = lookup.q;
-      if (lookup.r !== undefined) mergedFilters.repo = lookup.r;
+      if (lookup.q !== undefined) mergedFilters.text = decodeHashPart(lookup.q);
+      if (lookup.r !== undefined) mergedFilters.repo = decodeHashPart(lookup.r);
       if (lookup.f) {
         const flags = lookup.f.split(",");
         mergedFilters.onlyFailing = flags.includes("failing");
         mergedFilters.onlyChanges = flags.includes("changes");
         mergedFilters.onlyNew = flags.includes("new");
+        mergedFilters.onlyDirect = flags.includes("direct");
+        mergedFilters.onlyTeam = flags.includes("team");
+        mergedFilters.onlyReady = flags.includes("ready");
       }
       setFilters(mergedFilters);
+      setHydrated(true);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [settings.defaultTab]); // initial load only; hash changes are rare
 
   // Persist filter defaults to IndexedDB whenever they change, so they
-  // survive page reloads without needing a shared URL.
+  // survive page reloads without needing a shared URL. Wait for the stored
+  // defaults to load first, otherwise the initial empty state overwrites them.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated) return;
     void saveFilterDefaults(filters);
-  }, [filters.text, filters.repo, filters.onlyFailing, filters.onlyChanges, filters.onlyNew]);
+  }, [hydrated, filters]);
 
   // Write URL hash when tab or sort changes, or when a quick filter chip is toggled.
   // We memoize the hash string so the effect doesn't fire on every re-render.
   const hashParts = useMemo(() => {
     const parts: string[] = [];
     parts.push(`t:${tab}`);
-    parts.push(`q:${filters.text}`);
+    parts.push(`q:${encodeHashPart(filters.text)}`);
     parts.push(`s:${sort}`);
+    if (filters.repo) parts.push(`r:${encodeHashPart(filters.repo)}`);
     const flags: string[] = [];
     if (filters.onlyFailing) flags.push("failing");
     if (filters.onlyChanges) flags.push("changes");
     if (filters.onlyNew) flags.push("new");
+    if (filters.onlyDirect) flags.push("direct");
+    if (filters.onlyTeam) flags.push("team");
+    if (filters.onlyReady) flags.push("ready");
     if (flags.length > 0) parts.push(`f:${flags.join(",")}`);
-    return parts.join("/");
-  }, [tab, sort, filters.onlyFailing, filters.onlyChanges, filters.onlyNew]);
+    return `#/${parts.join("/")}`;
+  }, [
+    tab,
+    sort,
+    filters.text,
+    filters.repo,
+    filters.onlyFailing,
+    filters.onlyChanges,
+    filters.onlyNew,
+    filters.onlyDirect,
+    filters.onlyTeam,
+    filters.onlyReady,
+  ]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!hydrated || typeof window === "undefined") return;
     window.location.hash = hashParts;
-  }, [hashParts]); // only when the computed hash string changes
+  }, [hashParts, hydrated]); // only when the computed hash string changes
 
   const sessionViewer = (() => {
     try {
