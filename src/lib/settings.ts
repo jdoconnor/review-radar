@@ -12,6 +12,7 @@ const REFRESH_KEY = "review-radar.refresh-seconds";
 const TAB_KEY = "review-radar.default-tab";
 const THEME_KEY = "review-radar.theme";
 const LAST_SEEN_KEY = "review-radar.last-seen";
+const BASELINE_KEY = "review-radar.activity-baseline";
 
 function storage(): Storage | null {
   try {
@@ -91,6 +92,26 @@ export function lastSeenFor(key: string): number | null {
   return readLastSeen()[key] ?? null;
 }
 
+/**
+ * The fallback mark for a pull request that has never been marked seen: the
+ * first time this browser started tracking activity. It is a plain timestamp,
+ * so replacing the token can clear it without retaining any PR keys.
+ */
+export function baselineFor(): number | null {
+  const raw = read(BASELINE_KEY);
+  if (!raw) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Record the activity baseline once; later calls keep the original time. */
+export function ensureBaseline(at = Date.now()): number {
+  const existing = baselineFor();
+  if (existing !== null) return existing;
+  write(BASELINE_KEY, String(at));
+  return at;
+}
+
 export function markSeen(key: string, at = Date.now()): void {
   const map = readLastSeen();
   map[key] = at;
@@ -105,4 +126,5 @@ export function markManySeen(keys: string[], at = Date.now()): void {
 
 export function clearLastSeen(): void {
   remove(LAST_SEEN_KEY);
+  remove(BASELINE_KEY);
 }

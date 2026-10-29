@@ -310,6 +310,41 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByTestId("new-activity")).not.toBeInTheDocument());
   });
 
+  it("seeds an activity baseline so later activity can be detected", async () => {
+    const pr = makePr();
+    const respond = (nodes: unknown[]) =>
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body)) as { variables?: { search?: string } };
+        const search = String(body.variables?.search ?? "");
+        return search.includes("review-requested") ? searchResponse([]) : searchResponse(nodes);
+      });
+    vi.stubGlobal("fetch", respond([pr]));
+
+    render(<App />);
+    await userEvent.click(screen.getByTestId("tab-mine"));
+    await screen.findByText(pr.title);
+
+    await waitFor(() => {
+      expect(localStorage.getItem("review-radar.activity-baseline")).toEqual(expect.any(String));
+    });
+    expect(screen.queryByTestId("new-activity")).not.toBeInTheDocument();
+
+    const baseline = Number(localStorage.getItem("review-radar.activity-baseline"));
+    const later = makePr({
+      comments: {
+        totalCount: 4,
+        nodes: [
+          ...(makePr().comments?.nodes ?? []),
+          { id: "C_4", createdAt: new Date(baseline + 1000).toISOString(), author: { login: "dave" } },
+        ],
+      },
+    });
+    vi.stubGlobal("fetch", respond([later]));
+
+    await userEvent.click(screen.getByTestId("refresh-all"));
+    expect(await screen.findByTestId("new-activity")).toHaveTextContent("1 new");
+  });
+
   it("renders an empty state when nothing needs review", async () => {
     vi.stubGlobal(
       "fetch",
