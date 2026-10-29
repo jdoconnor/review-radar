@@ -3,7 +3,7 @@ import { useCachedQuery } from "../hooks/useCachedQuery";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
 import { pullRequests, queryFor, variablesFor } from "../lib/queries";
-import { markSeen, clearLastSeen, lastSeenFor } from "../lib/settings";
+import { markSeen, clearLastSeen, lastSeenFor, baselineFor, ensureBaseline } from "../lib/settings";
 import {
   countMergeReadiness,
   pullRequestKey,
@@ -223,10 +223,15 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     if (!mineQuery.data) return [];
     const nodes = pullRequests(mineQuery.data);
     const parents = stackParents(nodes);
+    // A pull request that has never been marked seen falls back to the first
+    // time this browser started tracking activity. Without a fallback, a
+    // missing mark reads as zero activity and the "N new" pill could never
+    // turn on.
+    const baseline = baselineFor();
     return nodes.map((pr) => {
       const key = pullRequestKey(pr);
       return toSummary(pr, {
-        lastSeenAt: lastSeenFor(key),
+        lastSeenAt: lastSeenFor(key) ?? baseline,
         reviewRequestedFromMe: false,
         viewerLogin,
         stackedOn: parents.get(key) ?? null,
@@ -235,6 +240,15 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   }, [mineQuery.data, seenVersion, viewerLogin]);
 
   const mineReadyCount = useMemo(() => countMergeReadiness(mineItems).ready, [mineItems]);
+
+  // Start the activity clock the first time the dashboard has data. This is
+  // deliberately not a per-PR mark: replacing the token clears last-seen marks,
+  // and a new baseline is just a timestamp, never the previous user's PR keys.
+  useEffect(() => {
+    if (!mineQuery.data || baselineFor() !== null) return;
+    ensureBaseline();
+    setSeenVersion((value) => value + 1);
+  }, [mineQuery.data]);
 
   const repos = useMemo(
     () =>
