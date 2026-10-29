@@ -380,6 +380,19 @@ describe("App", () => {
     expect(await screen.findByTestId("cache-indicator")).toBeInTheDocument();
   });
 
+  it("labels the last refresh with the viewer's local clock time", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => searchResponse([makePr()])),
+    );
+
+    render(<App />);
+    const pill = await screen.findByTestId("updated-indicator");
+    expect(pill.textContent).toMatch(/^updated \d/);
+    expect(pill.textContent).not.toBe("updated");
+    expect(pill.getAttribute("title")).toContain("Data last updated");
+  });
+
   it("switches between dark and light themes and remembers the choice", async () => {
     localStorage.setItem("review-radar.theme", "dark");
     vi.stubGlobal(
