@@ -452,6 +452,8 @@ const BASE_FILTERS = {
   onlyNew: false,
   onlyDirect: false,
   onlyTeam: false,
+  onlyReady: false,
+  onlyNoReviewers: false,
 };
 
 function summaryWithReviewers(
@@ -606,6 +608,79 @@ describe("reviewer count", () => {
     });
     expect(unknown.pendingReviewRequests).toBe(0);
     expect(unknown.reviewersKnown).toBe(false);
+  });
+});
+
+describe("no reviewers filter", () => {
+  function withReviewRequests(number: number, reviewRequests: PullRequestNode["reviewRequests"]) {
+    return toSummary(
+      makePr({
+        id: `pr-${number}`,
+        number,
+        title: `Pull request ${number}`,
+        reviewRequests,
+      }),
+      { lastSeenAt: null, reviewRequestedFromMe: false },
+    );
+  }
+
+  it("keeps only pull requests with no reviewer requested and known reviewer data", () => {
+    const none = withReviewRequests(20, { totalCount: 0, nodes: [] });
+    const user = withReviewRequests(21, {
+      totalCount: 1,
+      nodes: [{ requestedReviewer: { __typename: "User", login: "alice" } }],
+    });
+    const team = withReviewRequests(22, {
+      totalCount: 1,
+      nodes: [{ requestedReviewer: { __typename: "Team", name: "Platform", slug: "platform" } }],
+    });
+    const unknown = withReviewRequests(23, null);
+
+    expect(filterSummaries([none, user, team, unknown], { ...BASE_FILTERS, onlyNoReviewers: true })).toEqual([
+      none,
+    ]);
+    expect(filterSummaries([none, user, team, unknown], BASE_FILTERS)).toEqual([none, user, team, unknown]);
+  });
+
+  it("composes with the other quick filters", () => {
+    const none = toSummary(
+      makePr({
+        id: "pr-24",
+        number: 24,
+        title: "Pull request 24",
+        reviewRequests: { totalCount: 0, nodes: [] },
+        commits: GREEN_CHECKS,
+      }),
+      { lastSeenAt: null, reviewRequestedFromMe: false },
+    );
+    const failing = toSummary(
+      makePr({
+        id: "pr-25",
+        number: 25,
+        title: "Pull request 25",
+        reviewRequests: { totalCount: 0, nodes: [] },
+        commits: {
+          nodes: [
+            {
+              commit: {
+                statusCheckRollup: {
+                  state: "FAILURE",
+                  contexts: {
+                    totalCount: 1,
+                    nodes: [{ __typename: "CheckRun", name: "test", conclusion: "FAILURE" }],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+      { lastSeenAt: null, reviewRequestedFromMe: false },
+    );
+
+    expect(
+      filterSummaries([none, failing], { ...BASE_FILTERS, onlyNoReviewers: true, onlyFailing: true }),
+    ).toEqual([failing]);
   });
 });
 

@@ -54,7 +54,7 @@ export function PullRequestList({
   const effectiveFilters = useMemo(
     () =>
       kind === "review"
-        ? { ...filters, onlyNew: false, onlyReady: false }
+        ? { ...filters, onlyNew: false, onlyReady: false, onlyNoReviewers: false }
         : { ...filters, onlyDirect: false, onlyTeam: false },
     [filters, kind],
   );

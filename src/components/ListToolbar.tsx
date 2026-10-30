@@ -9,6 +9,7 @@ export interface Filters {
   onlyDirect: boolean;
   onlyTeam: boolean;
   onlyReady: boolean;
+  onlyNoReviewers: boolean;
 }
 
 export type SortOrder = "attention" | "oldest" | "newest";
@@ -32,6 +33,7 @@ export const EMPTY_FILTERS: Filters = {
   onlyDirect: false,
   onlyTeam: false,
   onlyReady: false,
+  onlyNoReviewers: false,
 };
 
 export function hasActiveFilters(filters: Filters): boolean {
@@ -43,7 +45,8 @@ export function hasActiveFilters(filters: Filters): boolean {
     filters.onlyNew ||
     filters.onlyDirect ||
     filters.onlyTeam ||
-    filters.onlyReady
+    filters.onlyReady ||
+    filters.onlyNoReviewers
   );
 }
 
@@ -140,6 +143,16 @@ export function ListToolbar({
       ) : null}
       {view !== "review" ? (
         <div className="chips" role="group" aria-label="Quick filters">
+          <button
+            type="button"
+            className={`chip ${filters.onlyNoReviewers ? "active" : ""}`}
+            aria-pressed={filters.onlyNoReviewers}
+            title="Only your pull requests with no reviewer requested"
+            onClick={() => onFiltersChange({ ...filters, onlyNoReviewers: !filters.onlyNoReviewers })}
+            data-testid="filter-no-reviewers"
+          >
+            No reviewers
+          </button>
           <button
             type="button"
             className={`chip ${filters.onlyReady ? "active" : ""}`}
