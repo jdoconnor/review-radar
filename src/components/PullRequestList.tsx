@@ -114,7 +114,10 @@ export function PullRequestList({
         });
       } else if (event.key === "Enter" || event.key === "o") {
         const selected = rows.find((item) => item.key === current);
-        if (selected) window.open(selected.url, "_blank", "noopener,noreferrer");
+        if (selected) {
+          if (selected.newActivity > 0) markSeen(selected.key);
+          window.open(selected.url, "_blank", "noopener,noreferrer");
+        }
       } else if (event.key === "m") {
         const selected = rows.find((item) => item.key === current);
         if (selected && selected.newActivity > 0) markSeen(selected.key);

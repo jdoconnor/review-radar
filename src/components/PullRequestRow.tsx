@@ -26,6 +26,14 @@ interface Props {
 }
 
 export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMarkSeen }: Props) {
+  // Opening or selecting a pull request is reading it, so any click on the row
+  // clears its "new" activity. Focus alone does not: tabbing through the list
+  // must not mark every row read. Only rows with activity have anything to
+  // clear, which also keeps clicks in the review queue from writing a mark.
+  const markRead = (): void => {
+    if (pr.newActivity > 0) onMarkSeen(pr.key);
+  };
+
   return (
     <article
       className={`pr-row ${selected ? "selected" : ""} ${
@@ -39,7 +47,10 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
-      onClick={onSelect}
+      onClick={() => {
+        onSelect();
+        markRead();
+      }}
       onFocus={onSelect}
     >
       <div className="pr-main">
@@ -60,7 +71,11 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
             target="_blank"
             rel="noreferrer"
             data-testid="pr-title"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              markRead();
+            }}
+            onAuxClick={markRead}
           >
             {pr.title}
           </a>
