@@ -110,6 +110,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
         mergedFilters.onlyDirect = flags.includes("direct");
         mergedFilters.onlyTeam = flags.includes("team");
         mergedFilters.onlyReady = flags.includes("ready");
+        mergedFilters.onlyNoReviewers = flags.includes("no-reviewers");
       }
       setFilters(mergedFilters);
       setHydrated(true);
@@ -142,6 +143,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     if (filters.onlyDirect) flags.push("direct");
     if (filters.onlyTeam) flags.push("team");
     if (filters.onlyReady) flags.push("ready");
+    if (filters.onlyNoReviewers) flags.push("no-reviewers");
     if (flags.length > 0) parts.push(`f:${flags.join(",")}`);
     return `#/${parts.join("/")}`;
   }, [
@@ -155,6 +157,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     filters.onlyDirect,
     filters.onlyTeam,
     filters.onlyReady,
+    filters.onlyNoReviewers,
   ]);
 
   useEffect(() => {
