@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
-import { pullRequests, queryFor, variablesFor } from "../lib/queries";
+import { myPullRequests, pullRequests, queryFor, variablesFor } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor, baselineFor, ensureBaseline } from "../lib/settings";
 import {
   countMergeReadiness,
@@ -11,7 +11,7 @@ import {
   toSummary,
   clockTime,
 } from "../lib/normalize";
-import type { SearchPayload } from "../lib/types";
+import type { MySearchPayload, SearchPayload } from "../lib/types";
 import type { Settings } from "../lib/settings";
 import type { ResolvedTheme, ThemePreference } from "../lib/theme";
 import { loadFilterDefaults, saveFilterDefaults } from "../lib/filterDefaults";
@@ -194,7 +194,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     active: tab === "review",
   });
 
-  const mineQuery = useCachedQuery<SearchPayload>({
+  const mineQuery = useCachedQuery<MySearchPayload>({
     enabled: true,
     token: settings.token,
     query: queryFor("mine"),
@@ -224,7 +224,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const mineItems = useMemo(() => {
     void seenVersion;
     if (!mineQuery.data) return [];
-    const nodes = pullRequests(mineQuery.data);
+    const nodes = myPullRequests(mineQuery.data);
     const parents = stackParents(nodes);
     // A pull request that has never been marked seen falls back to the first
     // time this browser started tracking activity. Without a fallback, a

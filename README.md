@@ -7,9 +7,9 @@ A cache-first GitHub review dashboard. Two questions, one screen:
 - **Needs my review** — open pull requests with an outstanding review request
   from me, oldest first, with whether you or someone else approved, CI, draft,
   team and conflict state.
-- **My pull requests** — open PRs I authored, with whether you or someone else
-  approved, changes requested, CI state, merge conflicts, and comments/reviews
-  since I last marked the PR seen.
+- **My pull requests** — open PRs I authored or was assigned, with whether you or
+  someone else approved, changes requested, CI state, merge conflicts, and
+  comments/reviews since I last marked the PR seen.
 
 It is a static React app. It talks directly to the GitHub GraphQL API with a
 token you paste in; there is no backend, no proxy and no analytics. Responses are
@@ -21,7 +21,7 @@ instant and a network failure leaves the last good screen in place.
 Walking skeleton on `main`:
 
 - token entry and validation
-- GraphQL search for review requests and authored PRs
+- GraphQL search for review requests, authored PRs and assigned PRs
 - IndexedDB cache with ETag support, stale-while-revalidate and pruning
 - approval / changes-requested / CI / conflict / new-activity derivations
 - stack awareness: a PR whose base is not `main` or `staging` is a stack even
