@@ -343,16 +343,28 @@ export function countMergeReadiness(
   return { ready, waiting: items.length - ready };
 }
 
-function activityAfter(pr: PullRequestNode, lastSeenAt: number | null): number {
+/**
+ * Comments and reviews added since the viewer last marked the pull request
+ * seen. The viewer's own activity never counts: on an authored pull request
+ * that is the author, but on an assigned one the author is somebody else and
+ * their comments are exactly what the viewer needs to see.
+ */
+function activityAfter(
+  pr: PullRequestNode,
+  lastSeenAt: number | null,
+  viewerLogin?: string | null,
+): number {
   if (lastSeenAt === null) return 0;
-  const author = pr.author?.login ?? "";
+  const self = (viewerLogin?.trim() || pr.author?.login || "").toLowerCase();
+  const bySelf = (login?: string | null): boolean =>
+    (login ?? "").trim().toLowerCase() === self;
   let count = 0;
   for (const comment of pr.comments?.nodes ?? []) {
-    if (comment.author?.login === author) continue;
+    if (bySelf(comment.author?.login)) continue;
     if (Date.parse(comment.createdAt) > lastSeenAt) count += 1;
   }
   for (const review of pr.reviews?.nodes ?? []) {
-    if (!review.submittedAt || review.author?.login === author) continue;
+    if (!review.submittedAt || bySelf(review.author?.login)) continue;
     if (Date.parse(review.submittedAt) > lastSeenAt) count += 1;
   }
   return count;
@@ -431,7 +443,7 @@ export function toSummary(
     viewerKnown: Boolean(viewerLogin),
     changesRequested,
     comments: pr.comments?.totalCount ?? 0,
-    newActivity: activityAfter(pr, options.lastSeenAt),
+    newActivity: activityAfter(pr, options.lastSeenAt, viewerLogin),
     lastSeenAt: options.lastSeenAt,
     checks,
     readiness,

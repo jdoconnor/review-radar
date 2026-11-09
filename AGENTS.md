@@ -9,9 +9,9 @@ Two views, both optimized for speed and low API spend:
 
 1. **Needs my review** — open PRs where GitHub says a review is requested from
    me, oldest first, with CI, draft, team-review and conflict state.
-2. **My pull requests** — open PRs I authored, with approval count, changes
-   requested, CI state, merge conflicts, and comments/reviews since I last
-   marked the PR seen.
+2. **My pull requests** — open PRs I authored or was assigned, with approval
+   count, changes requested, CI state, merge conflicts, and comments/reviews
+   since I last marked the PR seen.
 
 Everything runs in the browser against the GitHub GraphQL API. The token is
 stored in `localStorage`; responses are stored in IndexedDB and rendered before

@@ -151,6 +151,27 @@ describe("toSummary", () => {
     expect(summary.reviewRequestedFromMe).toBe(true);
   });
 
+  it("counts the author's activity on a pull request assigned to the viewer", () => {
+    const pr = makePr({
+      author: { login: "alice", avatarUrl: "" },
+      comments: {
+        totalCount: 2,
+        nodes: [
+          { id: "c1", createdAt: "2026-10-20T10:00:00Z", author: { login: "alice" } },
+          { id: "c2", createdAt: "2026-10-20T11:00:00Z", author: { login: "jdoconnor" } },
+        ],
+      },
+      reviews: { nodes: [] },
+    });
+    const summary = toSummary(pr, {
+      lastSeenAt: Date.parse("2026-10-20T09:00:00Z"),
+      reviewRequestedFromMe: false,
+      viewerLogin: "jdoconnor",
+    });
+    // The author's comment is new to the assignee; the viewer's own is not.
+    expect(summary.newActivity).toBe(1);
+  });
+
   it("summarises approvals and changes requested", () => {
     const pr = makePr({
       reviews: {

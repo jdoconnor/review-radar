@@ -48,8 +48,8 @@ export function PullRequestList({
 }: Props) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
-  // Review requests have no last-seen mark or merge readiness, and my own pull
-  // requests are never requested from me, so each queue ignores the other
+  // Review requests have no last-seen mark or merge readiness, and "my pull
+  // requests" now includes assigned work, so each queue ignores the other
   // queue's chips.
   const effectiveFilters = useMemo(
     () =>
@@ -218,7 +218,7 @@ export function PullRequestList({
         ) : (
           <EmptyState
             title="No open pull requests of yours"
-            body="Everything you opened is merged, closed, or not opened yet."
+            body="Nothing you opened or were assigned to is open right now."
           />
         )
       ) : visible.length === 0 ? (

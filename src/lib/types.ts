@@ -132,9 +132,24 @@ export interface PullRequestNode {
   } | null;
 }
 
+export type SearchNodes = Array<PullRequestNode | Record<string, never>>;
+
 export interface SearchPayload {
-  search: { nodes: Array<PullRequestNode | Record<string, never>> };
+  search: { nodes: SearchNodes };
   viewer: { login: string };
+  rateLimit: RateLimit;
+}
+
+/**
+ * The "my pull requests" view runs two searches in one request: the PRs the
+ * viewer authored and the PRs assigned to them. `search` is the legacy single
+ * connection, kept so an older cached response still reads.
+ */
+export interface MySearchPayload {
+  search?: { nodes: SearchNodes };
+  authored?: { nodes: SearchNodes };
+  assigned?: { nodes: SearchNodes };
+  viewer?: { login: string };
   rateLimit: RateLimit;
 }
 
