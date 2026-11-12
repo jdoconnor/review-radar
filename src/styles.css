@@ -374,6 +374,22 @@ select:focus {
   font-size: 12px;
 }
 
+.button.refresh-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+
+.refresh-spinner {
+  flex: none;
+  width: 0.85em;
+  height: 0.85em;
+  border: 0.125em solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
 .button.ghost {
   background: transparent;
 }
@@ -802,6 +818,12 @@ select:focus {
   }
 }
 
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -1087,5 +1109,11 @@ kbd {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .refresh-spinner {
+    animation: none;
+    border-inline-end-color: currentColor;
+    opacity: 0.6;
   }
 }

@@ -14,7 +14,8 @@ export interface CachedQueryState<T> {
   stale: boolean;
   lastUpdated: number | null;
   rateLimit: RateLimit | null;
-  refresh: () => void;
+  /** Resolves when the refresh this call started has settled. */
+  refresh: () => Promise<void>;
 }
 
 interface Options {
@@ -169,7 +170,7 @@ export function useCachedQuery<T>(options: Options): CachedQueryState<T> {
 
   const refresh = useCallback(() => {
     failures.current = 0;
-    void run(true);
+    return run(true);
   }, [run]);
 
   return { data, error, warning, loading, refreshing, fromCache, stale, lastUpdated, rateLimit, refresh };
