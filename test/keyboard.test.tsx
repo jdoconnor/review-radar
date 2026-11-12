@@ -173,7 +173,7 @@ describe("keyboard navigation", () => {
     expect(rows[0]?.dataset.selected).toBe("true");
 
     const queue = screen.getByTestId("review-queue");
-    await userEvent.click(screen.getByTestId("refresh"));
+    await userEvent.click(screen.getByTestId("refresh-all"));
 
     const afterRefresh = await within(queue).findAllByTestId("pr-row");
     expect(afterRefresh).toHaveLength(2);

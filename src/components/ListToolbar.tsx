@@ -58,8 +58,6 @@ interface Props {
   repos: string[];
   /** Which queues the toolbar is driving, so only relevant chips render. */
   view: "review" | "mine" | "both";
-  refreshing: boolean;
-  onRefresh: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
 }
 
@@ -70,8 +68,6 @@ export function ListToolbar({
   onSortChange,
   repos,
   view,
-  refreshing,
-  onRefresh,
   searchRef,
 }: Props) {
   return (
@@ -201,15 +197,6 @@ export function ListToolbar({
           Clear
         </button>
       ) : null}
-      <button
-        type="button"
-        className="button tiny ghost refresh"
-        onClick={onRefresh}
-        disabled={refreshing}
-        data-testid="refresh"
-      >
-        {refreshing ? "Refreshing…" : "Refresh"}
-      </button>
     </div>
   );
 }

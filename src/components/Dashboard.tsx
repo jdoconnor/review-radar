@@ -52,6 +52,9 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortOrder>(DEFAULT_SORT[settings.defaultTab]);
   const [hydrated, setHydrated] = useState(false);
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [refreshNotice, setRefreshNotice] = useState("");
+  const refreshSeq = useRef(0);
   const searchRef = useRef<HTMLInputElement>(null);
   const wide = useMediaQuery("(min-width: 68.75em)");
 
@@ -266,10 +269,30 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
     setSeenVersion((value) => value + 1);
   }, []);
 
+  // A manual refresh is a user action, so it gets its own busy state and a
+  // spoken status. Background polling stays quiet: a poll that updates the
+  // timestamp every minute should not announce itself.
+  const runManualRefresh = useCallback((targets: Array<() => Promise<void>>, scope: string) => {
+    const sequence = ++refreshSeq.current;
+    setManualRefreshing(true);
+    setRefreshNotice(`Refreshing ${scope} from GitHub…`);
+    void Promise.allSettled(targets.map((target) => target())).then(() => {
+      if (sequence !== refreshSeq.current) return;
+      const time = clockTime(Date.now());
+      setManualRefreshing(false);
+      setRefreshNotice(time ? `Refreshed ${scope} at ${time}.` : `Refreshed ${scope}.`);
+    });
+  }, []);
+
   const refreshAll = useCallback(() => {
-    reviewQuery.refresh();
-    mineQuery.refresh();
-  }, [reviewQuery, mineQuery]);
+    runManualRefresh([reviewQuery.refresh, mineQuery.refresh], "both queues");
+  }, [runManualRefresh, reviewQuery.refresh, mineQuery.refresh]);
+
+  // The `r` shortcut refreshes the column that owns the keyboard, not both.
+  const refreshActive = useCallback(() => {
+    const target = tab === "review" ? reviewQuery : mineQuery;
+    runManualRefresh([target.refresh], "this queue");
+  }, [runManualRefresh, tab, reviewQuery, mineQuery]);
 
   const activeQuery = tab === "review" ? reviewQuery : mineQuery;
   const inactiveQuery = tab === "review" ? mineQuery : reviewQuery;
@@ -327,7 +350,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       lastUpdated={reviewQuery.lastUpdated}
       onActivate={() => setTab("review")}
       onMarkSeen={onMarkSeen}
-      onRefresh={reviewQuery.refresh}
+      onRefresh={refreshActive}
     />
   );
 
@@ -349,7 +372,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       lastUpdated={mineQuery.lastUpdated}
       onActivate={() => setTab("mine")}
       onMarkSeen={onMarkSeen}
-      onRefresh={mineQuery.refresh}
+      onRefresh={refreshActive}
     />
   );
 
@@ -451,9 +474,32 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
             </span>
           )}
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
-          <button type="button" className="button tiny" onClick={refreshAll} data-testid="refresh-all">
-            Refresh
+          <button
+            type="button"
+            className="button tiny refresh-all"
+            onClick={refreshAll}
+            disabled={manualRefreshing}
+            aria-busy={manualRefreshing || undefined}
+            title={
+              manualRefreshing
+                ? "Waiting for GitHub to answer"
+                : "Fetch the latest pull requests and reviews from GitHub now"
+            }
+            data-testid="refresh-all"
+            data-state={manualRefreshing ? "refreshing" : "idle"}
+          >
+            {manualRefreshing ? (
+              <>
+                <span className="refresh-spinner" aria-hidden="true" />
+                Refreshing…
+              </>
+            ) : (
+              "Refresh"
+            )}
           </button>
+          <span className="sr-only" role="status" data-testid="refresh-status">
+            {refreshNotice}
+          </span>
           <button
             type="button"
             className="icon-button"
@@ -466,7 +512,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
         </div>
       </header>
 
-      <main className="content">
+      <main className="content" aria-busy={manualRefreshing || undefined}>
         <ListToolbar
           filters={filters}
           onFiltersChange={setFilters}
@@ -474,8 +520,6 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
           onSortChange={setSort}
           repos={repos}
           view={wide ? "both" : tab}
-          refreshing={reviewQuery.refreshing || mineQuery.refreshing}
-          onRefresh={refreshAll}
           searchRef={searchRef}
         />
         {wide ? (

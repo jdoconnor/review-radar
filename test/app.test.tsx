@@ -345,6 +345,55 @@ describe("App", () => {
     expect(await screen.findByTestId("new-activity")).toHaveTextContent("1 new");
   });
 
+  it("offers one refresh control, in the header", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => searchResponse([])),
+    );
+
+    render(<App />);
+    await screen.findByText("No pull requests are waiting on you");
+
+    const refresh = screen.getByTestId("refresh-all");
+    expect(refresh.closest("header")).not.toBeNull();
+    expect(refresh).toHaveTextContent("Refresh");
+    expect(screen.queryByTestId("refresh")).not.toBeInTheDocument();
+    expect(screen.getByTestId("list-toolbar")).not.toContainElement(refresh);
+  });
+
+  it("says what a manual refresh is doing and when it finishes", async () => {
+    let gated = false;
+    const gateControl: { release: () => void } = { release: () => {} };
+    const gate = new Promise<void>((resolve) => {
+      gateControl.release = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        if (gated) await gate;
+        return searchResponse([]);
+      }),
+    );
+
+    render(<App />);
+    await screen.findByText("No pull requests are waiting on you");
+
+    gated = true;
+    const refresh = screen.getByTestId("refresh-all");
+    await userEvent.click(refresh);
+
+    expect(refresh).toBeDisabled();
+    expect(refresh).toHaveTextContent("Refreshing…");
+    expect(refresh).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("refresh-status")).toHaveTextContent("Refreshing both queues from GitHub…");
+
+    gateControl.release();
+
+    await waitFor(() => expect(screen.getByTestId("refresh-all")).not.toBeDisabled());
+    expect(screen.getByTestId("refresh-all")).toHaveTextContent("Refresh");
+    expect(screen.getByTestId("refresh-status")).toHaveTextContent(/^Refreshed both queues at /);
+  });
+
   it("renders an empty state when nothing needs review", async () => {
     vi.stubGlobal(
       "fetch",
