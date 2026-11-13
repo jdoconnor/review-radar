@@ -13,6 +13,7 @@ const PR_FIELDS = `
   deletions
   changedFiles
   mergeable
+  mergeStateStatus
   reviewDecision
   baseRefName
   headRefName

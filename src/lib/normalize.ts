@@ -427,6 +427,7 @@ export function toSummary(
     deletions: pr.deletions,
     changedFiles: pr.changedFiles,
     mergeable: pr.mergeable,
+    needsRebase: pr.mergeStateStatus === "BEHIND",
     reviewDecision: pr.reviewDecision,
     baseRefName,
     labels: pr.labels?.nodes ?? [],
@@ -480,6 +481,7 @@ export function filterSummaries(
     onlyTeam?: boolean;
     onlyReady?: boolean;
     onlyNoReviewers?: boolean;
+    onlyRebase?: boolean;
   },
 ): PullRequestSummary[] {
   const text = filters.text.trim().toLowerCase();
@@ -491,6 +493,7 @@ export function filterSummaries(
     if (filters.onlyDirect && !pr.directReviewRequest) return false;
     if (filters.onlyTeam && pr.teamReviewRequests.length === 0) return false;
     if (filters.onlyReady && pr.readiness.state !== "ready") return false;
+    if (filters.onlyRebase && !pr.needsRebase) return false;
     // Unknown reviewer data is not "no reviewers": a permission-limited response
     // would otherwise claim nobody was asked when GitHub simply did not say.
     if (filters.onlyNoReviewers && (!pr.reviewersKnown || pr.pendingReviewRequests > 0)) return false;

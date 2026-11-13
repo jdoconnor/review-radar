@@ -717,6 +717,11 @@ select:focus {
   color: var(--red);
 }
 
+/* Behind its base branch: amber, because a rebase is still actionable. */
+.rebase {
+  color: var(--amber);
+}
+
 .team {
   border-color: var(--accent-border);
   color: var(--accent);
