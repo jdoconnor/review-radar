@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { PullRequestSummary } from "../lib/types";
 import {
   Age,
@@ -21,12 +22,27 @@ interface Props {
   pr: PullRequestSummary;
   kind: "review" | "mine";
   viewerLogin: string | null;
+  /**
+   * How many rungs deep this pull request sits in a stack. 0 is a standalone
+   * pull request or the base of a stack, which renders flush with the list.
+   */
+  stackDepth?: number;
   selected: boolean;
   onSelect: () => void;
   onMarkSeen: (key: string) => void;
 }
 
-export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMarkSeen }: Props) {
+export function PullRequestRow({
+  pr,
+  kind,
+  viewerLogin,
+  stackDepth = 0,
+  selected,
+  onSelect,
+  onMarkSeen,
+}: Props) {
+  const stacked = stackDepth > 0;
+
   // Opening or selecting a pull request is reading it, so any click on the row
   // clears its "new" activity. Focus alone does not: tabbing through the list
   // must not mark every row read. Only rows with activity have anything to
@@ -37,7 +53,7 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
 
   return (
     <article
-      className={`pr-row ${selected ? "selected" : ""} ${
+      className={`pr-row ${stacked ? "stacked-row" : ""} ${selected ? "selected" : ""} ${
         kind === "review" ? "needs-review" : `readiness-${pr.readiness.state}`
       }`}
       data-testid="pr-row"
@@ -45,9 +61,11 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
       data-readiness={kind === "mine" ? pr.readiness.state : undefined}
       data-in-stack={pr.stack ? "true" : "false"}
       data-base-ref={pr.baseRefName || undefined}
+      data-stack-depth={stackDepth}
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
+      style={stacked ? ({ "--stack-depth": stackDepth } as CSSProperties) : undefined}
       onClick={() => {
         onSelect();
         markRead();
@@ -56,6 +74,14 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
     >
       <div className="pr-main">
         <div className="pr-meta">
+          {stacked ? (
+            <>
+              <span className="stack-elbow" aria-hidden="true">
+                ↳
+              </span>
+              <span className="sr-only">Stacked under the pull request above.</span>
+            </>
+          ) : null}
           <span className="repo" data-testid="pr-repo">
             {pr.repo}
           </span>

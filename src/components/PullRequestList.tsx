@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { GithubError } from "../lib/github";
-import { countMergeReadiness, filterSummaries, sortForAttention } from "../lib/normalize";
+import {
+  countMergeReadiness,
+  filterSummaries,
+  groupStackRows,
+  sortForAttention,
+} from "../lib/normalize";
 import type { PullRequestSummary } from "../lib/types";
 import { EmptyState, Spinner } from "./Bits";
 import { hasActiveFilters } from "./ListToolbar";
@@ -102,6 +107,11 @@ export function PullRequestList({
     return rows;
   }, [heldKeys, visible, rowsByKey]);
 
+  // A stack reads as one unit: its base-most visible rung keeps the place the
+  // sort gave it and the rungs stacked on it follow, indented, right below.
+  const displayed = useMemo(() => groupStackRows(shown), [shown]);
+  const ordered = useMemo(() => displayed.map((row) => row.pr), [displayed]);
+
   const readinessCounts = useMemo(() => countMergeReadiness(shown), [shown]);
 
   useEffect(() => {
@@ -118,8 +128,9 @@ export function PullRequestList({
   // is updated during render. Re-registering it from an effect keyed on the rows
   // left a window where a key pressed as the rows committed ran the previous
   // listener, whose row list was still empty, so nothing was selected.
-  const latest = useRef({ active, visible: shown, selectedKey, onMarkSeen, onRefresh });
-  latest.current = { active, visible: shown, selectedKey, onMarkSeen, onRefresh };
+  // Keyboard movement follows the rendered order, so a stack moves as a block.
+  const latest = useRef({ active, visible: ordered, selectedKey, onMarkSeen, onRefresh });
+  latest.current = { active, visible: ordered, selectedKey, onMarkSeen, onRefresh };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -276,12 +287,13 @@ export function PullRequestList({
           onPointerEnter={() => setHeldKeys((current) => current ?? visible.map((pr) => pr.key))}
           onPointerLeave={() => setHeldKeys(null)}
         >
-          {shown.map((pr) => (
+          {displayed.map(({ pr, depth }) => (
             <PullRequestRow
               key={pr.key}
               pr={pr}
               kind={kind}
               viewerLogin={viewerLogin}
+              stackDepth={depth}
               selected={selectedKey === pr.key}
               onSelect={() => setSelectedKey(pr.key)}
               onMarkSeen={onMarkSeen}

@@ -9,6 +9,7 @@ import type {
   ReviewNode,
   StackNode,
   StackedOnNode,
+  StackedRow,
 } from "./types";
 
 const FAILURE_CONCLUSIONS = new Set([
@@ -244,6 +245,120 @@ export function stackParents(nodes: PullRequestNode[]): Map<string, StackedOnNod
     parents.set(pullRequestKey(pr), parent);
   }
   return parents;
+}
+
+/**
+ * Tie every stacked pull request to the rung it sits on. A rung is found by
+ * number within the same repository, so a view that holds both halves of a
+ * stack (native or inferred) can nest them. Native stacks without `entries`
+ * still know each pull request's position, so consecutive rungs are chained in
+ * position order.
+ */
+function stackParentKeys(
+  items: PullRequestSummary[],
+  inputOrder: Map<string, number>,
+): Map<string, string> {
+  const byNumber = new Map<string, string>();
+  for (const pr of items) byNumber.set(`${pr.repo}#${pr.number}`, pr.key);
+
+  const parents = new Map<string, string>();
+  // Explicit links: a native stack names the rung below it, and an inferred
+  // stack names its base branch resolved to a pull request in the view.
+  for (const pr of items) {
+    const stackedOn = pr.stack?.stackedOn;
+    if (!stackedOn) continue;
+    const parentKey = byNumber.get(`${pr.repo}#${stackedOn.number}`);
+    if (parentKey && parentKey !== pr.key) parents.set(pr.key, parentKey);
+  }
+
+  const nativeStacks = new Map<string, PullRequestSummary[]>();
+  for (const pr of items) {
+    const stack = pr.stack;
+    if (!stack || stack.inferred || stack.number <= 0) continue;
+    const group = `${pr.repo}#${stack.number}`;
+    const members = nativeStacks.get(group) ?? [];
+    members.push(pr);
+    nativeStacks.set(group, members);
+  }
+
+  const byPosition = (left: PullRequestSummary, right: PullRequestSummary): number => {
+    const leftPosition = left.stack?.position ?? Number.MAX_SAFE_INTEGER;
+    const rightPosition = right.stack?.position ?? Number.MAX_SAFE_INTEGER;
+    if (leftPosition !== rightPosition) return leftPosition - rightPosition;
+    return (inputOrder.get(left.key) ?? 0) - (inputOrder.get(right.key) ?? 0);
+  };
+
+  for (const members of nativeStacks.values()) {
+    const ordered = [...members].sort(byPosition);
+    // Each rung below the first hangs off the one before it, unless GitHub
+    // already named a parent for it.
+    for (let index = 1; index < ordered.length; index += 1) {
+      const child = ordered[index];
+      const parent = ordered[index - 1];
+      if (!child || !parent || parents.has(child.key)) continue;
+      parents.set(child.key, parent.key);
+    }
+  }
+
+  // A parent that is not in the view (filtered out, closed, or not in this
+  // queue) does not bind anything: leave the child free to sort on its own.
+  for (const [childKey, parentKey] of parents) {
+    if (!byNumber.has(parentKey) || !inputOrder.has(childKey)) parents.delete(childKey);
+  }
+  return parents;
+}
+
+/**
+ * Weave stacks into a sorted list. The list arrives sorted; the base-most
+ * visible rung keeps the position its own sort key earned and every pull
+ * request stacked on it follows directly below, indented one level deeper. A
+ * child therefore inherits the stack's place in the order instead of being
+ * scattered by its own score, which is what makes a stack read as one unit.
+ *
+ * Filtering is not undone: when a parent is hidden, its children become roots
+ * and sort on their own keys. Rows are never dropped, even if a cycle somehow
+ * appears in the parent links.
+ */
+export function groupStackRows(items: PullRequestSummary[]): StackedRow[] {
+  const inputOrder = new Map(items.map((pr, index) => [pr.key, index]));
+  const byKey = new Map(items.map((pr) => [pr.key, pr]));
+  const parents = stackParentKeys(items, inputOrder);
+
+  const children = new Map<string, string[]>();
+  for (const [childKey, parentKey] of parents) {
+    const siblings = children.get(parentKey) ?? [];
+    siblings.push(childKey);
+    children.set(parentKey, siblings);
+  }
+  for (const siblings of children.values()) {
+    siblings.sort((left, right) => {
+      const leftPr = byKey.get(left);
+      const rightPr = byKey.get(right);
+      if (!leftPr || !rightPr) return 0;
+      const leftPosition = leftPr.stack?.position ?? Number.MAX_SAFE_INTEGER;
+      const rightPosition = rightPr.stack?.position ?? Number.MAX_SAFE_INTEGER;
+      if (leftPosition !== rightPosition) return leftPosition - rightPosition;
+      return (inputOrder.get(left) ?? 0) - (inputOrder.get(right) ?? 0);
+    });
+  }
+
+  const rows: StackedRow[] = [];
+  const placed = new Set<string>();
+  const place = (key: string, depth: number): void => {
+    if (placed.has(key)) return;
+    const pr = byKey.get(key);
+    if (!pr) return;
+    placed.add(key);
+    rows.push({ pr, depth });
+    for (const childKey of children.get(key) ?? []) place(childKey, depth + 1);
+  };
+
+  for (const pr of items) {
+    if (!parents.has(pr.key)) place(pr.key, 0);
+  }
+  // Defensive: a row must never disappear because of an unexpected parent link.
+  for (const pr of items) place(pr.key, 0);
+  return rows;
 }
 
 const MERGE_BLOCKER_LABELS: Record<MergeBlocker, string> = {
