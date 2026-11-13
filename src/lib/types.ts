@@ -245,6 +245,15 @@ export interface PullRequestSummary {
   readiness: MergeReadiness;
 }
 
+/**
+ * One rendered queue row: a pull request plus how many rungs deep it sits in a
+ * stack. A depth of 0 is a standalone pull request or the base of a stack.
+ */
+export interface StackedRow {
+  pr: PullRequestSummary;
+  depth: number;
+}
+
 export interface ViewerPayload {
   viewer: { login: string; avatarUrl: string; name: string | null };
   rateLimit: RateLimit;
