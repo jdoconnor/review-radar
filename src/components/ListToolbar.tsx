@@ -10,6 +10,7 @@ export interface Filters {
   onlyTeam: boolean;
   onlyReady: boolean;
   onlyNoReviewers: boolean;
+  onlyRebase: boolean;
 }
 
 export type SortOrder = "attention" | "oldest" | "newest";
@@ -34,6 +35,7 @@ export const EMPTY_FILTERS: Filters = {
   onlyTeam: false,
   onlyReady: false,
   onlyNoReviewers: false,
+  onlyRebase: false,
 };
 
 export function hasActiveFilters(filters: Filters): boolean {
@@ -46,7 +48,8 @@ export function hasActiveFilters(filters: Filters): boolean {
     filters.onlyDirect ||
     filters.onlyTeam ||
     filters.onlyReady ||
-    filters.onlyNoReviewers
+    filters.onlyNoReviewers ||
+    filters.onlyRebase
   );
 }
 
@@ -113,6 +116,18 @@ export function ListToolbar({
         <option value="oldest">Oldest first</option>
         <option value="newest">Recently updated</option>
       </select>
+      <div className="chips" role="group" aria-label="Branch state filters">
+        <button
+          type="button"
+          className={`chip ${filters.onlyRebase ? "active" : ""}`}
+          aria-pressed={filters.onlyRebase}
+          title="Only pull requests whose branch is behind its base branch and needs a rebase or update"
+          onClick={() => onFiltersChange({ ...filters, onlyRebase: !filters.onlyRebase })}
+          data-testid="filter-rebase"
+        >
+          Needs rebase
+        </button>
+      </div>
       {view !== "mine" ? (
         <div className="chips" role="group" aria-label="Review request filters">
           <button

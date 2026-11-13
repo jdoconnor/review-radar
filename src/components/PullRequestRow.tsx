@@ -11,6 +11,7 @@ import {
   LabelChips,
   MergeReadinessPill,
   NewActivityPill,
+  RebaseStatus,
   ReviewersPill,
   StackPill,
   TeamReviewPill,
@@ -118,6 +119,7 @@ export function PullRequestRow({ pr, kind, viewerLogin, selected, onSelect, onMa
           ) : null}
           <ApprovalStatus pr={pr} />
           <ConflictStatus conflicting={pr.mergeable === "CONFLICTING"} />
+          <RebaseStatus behind={pr.needsRebase} />
           <CheckStatus state={pr.checks.state} failing={pr.checks.failing} total={pr.checks.total} />
           <CommentsStatus count={pr.comments} />
         </span>

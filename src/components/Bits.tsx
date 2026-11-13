@@ -148,6 +148,26 @@ function ReviewerGlyph() {
   );
 }
 
+function RebaseGlyph() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" focusable="false">
+      <path
+        d="M2.75 8a5.25 5.25 0 0 1 9.4-2.66M13.25 8a5.25 5.25 0 0 1-9.4 2.66"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12.6 2.4v2.9H9.7M3.4 13.6v-2.9h2.9"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function StackGlyph() {
   return (
     <svg viewBox="0 0 16 16" fill="none" focusable="false">
@@ -263,6 +283,24 @@ export function ConflictStatus({ conflicting }: { conflicting: boolean }) {
   return (
     <StatusIcon label="Merge conflicts" testId="conflict-pill" className="conflict">
       <ConflictGlyph />
+    </StatusIcon>
+  );
+}
+
+/**
+ * GitHub marks a pull request `BEHIND` when its head branch is out of date with
+ * the base. Nothing on the row would otherwise say why it matched the "Needs
+ * rebase" filter, so the state gets its own compact icon.
+ */
+export function RebaseStatus({ behind }: { behind: boolean }) {
+  if (!behind) return null;
+  return (
+    <StatusIcon
+      label="Needs rebase: the branch is behind its base"
+      testId="rebase-pill"
+      className="rebase"
+    >
+      <RebaseGlyph />
     </StatusIcon>
   );
 }

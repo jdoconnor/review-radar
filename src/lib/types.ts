@@ -94,6 +94,21 @@ export interface CheckContextNode {
   state?: string;
 }
 
+/**
+ * GitHub's own merge-state verdict. `BEHIND` means the head branch is out of
+ * date with its base, so it needs a rebase or an "Update branch" before it can
+ * merge cleanly. Absent on responses cached before this field was requested.
+ */
+export type MergeStateStatus =
+  | "BEHIND"
+  | "BLOCKED"
+  | "CLEAN"
+  | "DIRTY"
+  | "DRAFT"
+  | "HAS_HOOKS"
+  | "UNKNOWN"
+  | "UNSTABLE";
+
 export interface PullRequestNode {
   id: string;
   number: number;
@@ -106,6 +121,8 @@ export interface PullRequestNode {
   deletions: number;
   changedFiles: number;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  /** GitHub's merge-state verdict; see `MergeStateStatus`. */
+  mergeStateStatus?: MergeStateStatus;
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
   /** Branch the pull request would merge into. */
   baseRefName?: string;
@@ -194,6 +211,8 @@ export interface PullRequestSummary {
   deletions: number;
   changedFiles: number;
   mergeable: PullRequestNode["mergeable"];
+  /** True when the head branch is behind its base and needs a rebase/update. */
+  needsRebase: boolean;
   reviewDecision: PullRequestNode["reviewDecision"];
   /** Branch the pull request would merge into; empty when GitHub omitted it. */
   baseRefName: string;

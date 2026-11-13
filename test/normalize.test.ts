@@ -475,6 +475,7 @@ const BASE_FILTERS = {
   onlyTeam: false,
   onlyReady: false,
   onlyNoReviewers: false,
+  onlyRebase: false,
 };
 
 function summaryWithReviewers(
@@ -702,6 +703,77 @@ describe("no reviewers filter", () => {
     expect(
       filterSummaries([none, failing], { ...BASE_FILTERS, onlyNoReviewers: true, onlyFailing: true }),
     ).toEqual([failing]);
+  });
+});
+
+describe("needs rebase", () => {
+  const summary = (overrides: Parameters<typeof makePr>[0]) =>
+    toSummary(makePr(overrides), { lastSeenAt: null, reviewRequestedFromMe: false });
+
+  const behind = summary({
+    id: "pr-behind",
+    number: 30,
+    mergeStateStatus: "BEHIND",
+    commits: GREEN_CHECKS,
+  });
+  const clean = summary({ id: "pr-clean", number: 31, mergeStateStatus: "CLEAN" });
+  const conflicting = summary({
+    id: "pr-dirty",
+    number: 32,
+    mergeable: "CONFLICTING",
+    mergeStateStatus: "DIRTY",
+  });
+  // A response cached before the field was requested has no verdict at all.
+  const legacy = summary({ id: "pr-legacy", number: 33, mergeStateStatus: undefined });
+
+  it("marks only a branch that GitHub reports as behind its base", () => {
+    expect(behind.needsRebase).toBe(true);
+    expect(clean.needsRebase).toBe(false);
+    expect(conflicting.needsRebase).toBe(false);
+    expect(legacy.needsRebase).toBe(false);
+  });
+
+  it("keeps only the behind branches, without treating conflicts as a rebase", () => {
+    expect(
+      filterSummaries([behind, clean, conflicting, legacy], { ...BASE_FILTERS, onlyRebase: true }),
+    ).toEqual([behind]);
+    expect(filterSummaries([behind, clean, conflicting, legacy], BASE_FILTERS)).toEqual([
+      behind,
+      clean,
+      conflicting,
+      legacy,
+    ]);
+  });
+
+  it("composes with the other quick filters", () => {
+    const failingBehind = summary({
+      id: "pr-failing-behind",
+      number: 34,
+      mergeStateStatus: "BEHIND",
+      commits: {
+        nodes: [
+          {
+            commit: {
+              statusCheckRollup: {
+                state: "FAILURE",
+                contexts: {
+                  totalCount: 1,
+                  nodes: [{ __typename: "CheckRun", name: "test", conclusion: "FAILURE" }],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(
+      filterSummaries([behind, failingBehind, clean], {
+        ...BASE_FILTERS,
+        onlyRebase: true,
+        onlyFailing: true,
+      }),
+    ).toEqual([failingBehind]);
   });
 });
 

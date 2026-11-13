@@ -14,6 +14,7 @@ export function makePr(overrides: Partial<PullRequestNode> = {}): PullRequestNod
     deletions: 30,
     changedFiles: 6,
     mergeable: "MERGEABLE",
+    mergeStateStatus: "CLEAN",
     reviewDecision: "REVIEW_REQUIRED",
     baseRefName: "main",
     repository: { nameWithOwner: "jdoconnor/review-radar" },
