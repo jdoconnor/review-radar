@@ -69,18 +69,57 @@ export function PullRequestList({
     return sortForAttention(filtered);
   }, [items, effectiveFilters, sort]);
 
-  const readinessCounts = useMemo(() => countMergeReadiness(visible), [visible]);
+  // A poll can reorder, insert or drop rows at any moment. If that happens while
+  // the pointer rests over a card, the card under the cursor changes and a click
+  // can land on a pull request the user never aimed at. So while the pointer is
+  // inside the rows, render the key order that was on screen when it entered and
+  // keep rows that the poll dropped in place; mouse-out releases the hold and the
+  // newest order applies. Row content still updates, because rows are resolved
+  // from the latest data by key.
+  const [heldKeys, setHeldKeys] = useState<string[] | null>(null);
+  const lastRows = useRef(new Map<string, PullRequestSummary>());
+
+  const rowsByKey = useMemo(() => new Map(visible.map((pr) => [pr.key, pr])), [visible]);
+
+  // Keep the newest copy of every row on screen so a row that a poll drops can
+  // still be drawn in place while the pointer holds the list still.
+  useEffect(() => {
+    const known = lastRows.current;
+    for (const pr of visible) known.set(pr.key, pr);
+    if (heldKeys) return;
+    for (const key of known.keys()) {
+      if (!rowsByKey.has(key)) known.delete(key);
+    }
+  }, [visible, heldKeys, rowsByKey]);
+
+  const shown = useMemo(() => {
+    if (!heldKeys) return visible;
+    const rows: PullRequestSummary[] = [];
+    for (const key of heldKeys) {
+      const pr = rowsByKey.get(key) ?? lastRows.current.get(key);
+      if (pr) rows.push(pr);
+    }
+    return rows;
+  }, [heldKeys, visible, rowsByKey]);
+
+  const readinessCounts = useMemo(() => countMergeReadiness(shown), [shown]);
 
   useEffect(() => {
-    if (selectedKey && !visible.some((item) => item.key === selectedKey)) setSelectedKey(null);
-  }, [visible, selectedKey]);
+    if (selectedKey && !shown.some((item) => item.key === selectedKey)) setSelectedKey(null);
+  }, [shown, selectedKey]);
+
+  // Filters and sort are the user's own changes, not a poll landing under the
+  // cursor, so they may rearrange the list immediately.
+  useEffect(() => {
+    setHeldKeys(null);
+  }, [effectiveFilters, sort]);
 
   // The listener is registered once and reads the latest props from a ref that
   // is updated during render. Re-registering it from an effect keyed on the rows
   // left a window where a key pressed as the rows committed ran the previous
   // listener, whose row list was still empty, so nothing was selected.
-  const latest = useRef({ active, visible, selectedKey, onMarkSeen, onRefresh });
-  latest.current = { active, visible, selectedKey, onMarkSeen, onRefresh };
+  const latest = useRef({ active, visible: shown, selectedKey, onMarkSeen, onRefresh });
+  latest.current = { active, visible: shown, selectedKey, onMarkSeen, onRefresh };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -221,15 +260,23 @@ export function PullRequestList({
             body="Nothing you opened or were assigned to is open right now."
           />
         )
-      ) : visible.length === 0 ? (
+      ) : shown.length === 0 ? (
         <EmptyState
           title="Nothing matches those filters"
           body="Clear the search or loosen the quick filters to see the rest."
           icon="⌕"
         />
       ) : (
-        <div className="rows" role="list" aria-label={kind === "review" ? "Review requests" : "My pull requests"}>
-          {visible.map((pr) => (
+        <div
+          className="rows"
+          role="list"
+          aria-label={kind === "review" ? "Review requests" : "My pull requests"}
+          data-testid="pr-rows"
+          data-held={heldKeys ? "true" : "false"}
+          onPointerEnter={() => setHeldKeys((current) => current ?? visible.map((pr) => pr.key))}
+          onPointerLeave={() => setHeldKeys(null)}
+        >
+          {shown.map((pr) => (
             <PullRequestRow
               key={pr.key}
               pr={pr}
