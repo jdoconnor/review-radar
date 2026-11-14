@@ -342,6 +342,24 @@ export function groupStackRows(items: PullRequestSummary[]): StackedRow[] {
     });
   }
 
+  // A collapsed row hides every rung below it, so its toggle has to know how
+  // many rows that is. Count once per key and guard against a malformed parent
+  // cycle so a bad link cannot hang the list.
+  const counted = new Map<string, number>();
+  const countDescendants = (key: string, path: Set<string>): number => {
+    const cached = counted.get(key);
+    if (cached !== undefined) return cached;
+    if (path.has(key)) return 0;
+    path.add(key);
+    let total = 0;
+    for (const childKey of children.get(key) ?? []) {
+      total += 1 + countDescendants(childKey, path);
+    }
+    path.delete(key);
+    counted.set(key, total);
+    return total;
+  };
+
   const rows: StackedRow[] = [];
   const placed = new Set<string>();
   const place = (key: string, depth: number): void => {
@@ -349,8 +367,9 @@ export function groupStackRows(items: PullRequestSummary[]): StackedRow[] {
     const pr = byKey.get(key);
     if (!pr) return;
     placed.add(key);
-    rows.push({ pr, depth });
-    for (const childKey of children.get(key) ?? []) place(childKey, depth + 1);
+    const childKeys = children.get(key) ?? [];
+    rows.push({ pr, depth, childKeys, descendants: countDescendants(key, new Set()) });
+    for (const childKey of childKeys) place(childKey, depth + 1);
   };
 
   for (const pr of items) {
@@ -359,6 +378,28 @@ export function groupStackRows(items: PullRequestSummary[]): StackedRow[] {
   // Defensive: a row must never disappear because of an unexpected parent link.
   for (const pr of items) place(pr.key, 0);
   return rows;
+}
+
+/**
+ * Drop the rows under every collapsed rung. Stacks start collapsed, so
+ * `expanded` holds the rows the reader opened; everything else hides the levels
+ * below it. Rows arrive in display order, so one depth marker is enough to skip
+ * a whole subtree. Expansion is per level: opening a row reveals its direct
+ * children still collapsed, not the entire stack.
+ */
+export function expandStackRows(
+  rows: StackedRow[],
+  expanded: ReadonlySet<string>,
+): StackedRow[] {
+  const visible: StackedRow[] = [];
+  let collapsedDepth = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    if (row.depth > collapsedDepth) continue;
+    collapsedDepth = Number.POSITIVE_INFINITY;
+    visible.push(row);
+    if (row.childKeys.length > 0 && !expanded.has(row.pr.key)) collapsedDepth = row.depth;
+  }
+  return visible;
 }
 
 const MERGE_BLOCKER_LABELS: Record<MergeBlocker, string> = {

@@ -183,97 +183,74 @@ done.
 - Never add a new network destination or send the GitHub token anywhere except
   the configured GraphQL host. That is a security rule as well as a design rule.
 
-## 5. Stack levels
+## 5. Stacks
 
 A stack is a chain of pull requests where each rung targets the branch of the
 rung below it. Only the bottom rung targets a stable branch (`main`, `staging`)
-and can merge first. A reader has to be able to answer three questions from one
-glance at a row:
+and can merge first. A stack must read as one unit without labelling each rung
+with a level number.
 
-- Is this pull request part of a stack?
-- Which level of the stack is it on?
-- What is it waiting on?
+### Shape
 
-### Numbering
+- The base-most visible rung keeps the position the active sort gave it. Every
+  rung stacked on it renders directly beneath, in stack order, indented one
+  step per level. A poll or re-sort must not scatter a stack through the queue.
+- Depth is structure, not a badge. Do not print `L1`, `L2` or other level
+  markers: the indent, the disclosure toggle and the stack pill already say
+  where a row sits.
+- Indentation uses one step of `1.25rem` per level via `margin-inline-start`, so
+  right-to-left layouts mirror it, and caps the offset at three steps so a long
+  stack still reflows. A stacked row also starts with a `↳` elbow, which is
+  `aria-hidden` and paired with an `sr-only` “Stacked under the pull request
+  above.”
+- When a filter hides the rung below, its children become roots and sort on
+  their own keys. They keep their `Stacked on <branch>` text and must not
+  pretend to target `main`.
 
-Define the level in user-facing terms, and keep it consistent with the data
-attribute.
+### Collapse and expand
 
-| Level | Base branch |
-| --- | --- |
-| 1 | `main` (or another stable branch) |
-| 2 | the head branch of the level 1 pull request |
-| N | the head branch of the level N−1 pull request |
+Stacks start collapsed, so the queue lists roots and stays short by default.
 
-`data-stack-depth` stays 0-based because level 1 is the base-most row and
-renders flush with the list; while the whole stack is visible the displayed
-level is `depth + 1`. When a filter hides the rungs below, the offset restarts
-at the first visible rung but the level label keeps the stack's own position, so
-the label is the only cue that still counts correctly. A standalone pull request
-targeting `main` is level 1 and must not show an elbow, a stack pill or
-indentation. A pull request whose base is a non-stable branch is always level 2
-or deeper, even when GitHub reports no native stack.
-
-### Visual encoding
-
-Indentation is the fastest cue and the one that breaks first. At 320 CSS px, in
-a right-to-left layout, at 200% zoom, in a screen reader and in a printout an
-indent is weak or invisible; past the depth cap two different levels render
-identically. Treat indentation as a hint and make the label the truth: every
-stacked row carries at least two cues, one of them non-spatial.
-
-1. **Placement.** The base-most visible rung keeps the position the sort gave
-   it; every rung above it follows directly beneath, in level order. A poll or a
-   re-sort must not scatter a stack through the queue.
-2. **Indent.** One step of `1.25rem` per level using `margin-inline-start`, so
-   right-to-left layouts mirror it. Cap the *offset* at three steps so a long
-   stack still reflows. The cap is a layout concession, not permission to stop
-   counting levels.
-3. **Elbow and level marker.** A `↳` glyph at the start of the meta line, then
-   an `L<n>` marker for the row's level. Both are `aria-hidden`; `sr-only` text
-   names the level: “Level 2 of 3, stacked under the pull request above.” The
-   marker keeps counting past the indent cap, so rungs 4 and 5 never look
-   identical.
-4. **Stack pill.** The pill reports what GitHub knows: `Stack 2/3` for a native
-   stack, `Stack · 3 PRs` when the position is missing, `Stack` for an inferred
-   branch stack. It answers “is this a stack and where in GitHub's stack am I”,
-   not “what level is it here”; the marker is the level, so a filtered-out
-   parent cannot make two labels disagree. Never show a count in place of a
-   level, and never show a level in place of an invented total.
-5. **Floor.** The stack's base row is the unmarked rung its children hang from,
-   and it targets `main` (or another stable branch). A rung whose parent is
-   filtered out of the view keeps its `Stacked on <branch>` text; it must not
-   claim to target `main` just because it now sorts on its own.
+1. A row with rungs below it gets a disclosure toggle at the start of its meta
+   line: a chevron plus the number of rows it hides (`2 stacked`). The button is
+   the only new control; the rest of the row stays the select target.
+2. Opening a row reveals its direct children only. Each revealed child is still
+   collapsed, so a long stack opens one level at a time.
+3. Closing a row hides every level below it. If the selected row was inside the
+   closed subtree, selection moves to the row that closed.
+4. Collapse state is keyed by pull request and lives for the mounted list. A
+   poll, sort or filter change must not close a level the reader opened.
+5. A row with no rungs below it gets no toggle, even when it belongs to a stack.
 
 ### Accessibility and interaction
 
-- The level marker is text, never only an indent or a color. It is
-  `aria-hidden` and paired with an `sr-only` sentence, so sighted and
-  screen-reader users get the same level.
-- The pill is a `role="img"` with an `aria-label` that repeats its position, the
-  total when known, and the base branch. Do not rely on the tooltip: it is not
-  available to touch or keyboard-only users.
-- A stack moves as one block under `j`/`k`; arrow keys are not repurposed. The
-  focused row keeps a visible focus ring, and its indent uses `scroll-margin` so
-  the ring is not clipped at the start edge.
+- The toggle is a real `<button type="button">` with `aria-expanded` and an
+  accessible name that states the action and count: “Show 2 stacked pull
+  requests” / “Hide 2 stacked pull requests”. The visible chevron is
+  `aria-hidden`; the count is visible text, not only a tooltip.
+- Hidden rows are not rendered, so `j`/`k`, `o`, `m` and screen-reader
+  navigation never land on a row the reader cannot see.
+- The toggle meets the `1.5rem` touch target and keeps a visible focus ring.
+  Clicking it must not mark the row seen; selection still follows focus, so the
+  opening row is the one a reader is on.
 - Indentation reduces the usable width of a row. At 320 CSS px the capped offset
-  must still leave the title and the status icons legible, and long titles wrap
-  rather than overflow.
-- If a vertical guide rail is added beside the indent, draw it with a border
-  token that meets 3:1 in both themes and survives `forced-colors`; never use a
-  background image, and never encode the level in color alone.
+  must still leave the title and status icons legible; long titles wrap rather
+  than overflow.
+- The stack pill still reports what GitHub knows: `Stack 2/3` for a native
+  stack, `Stack · 3 PRs` when the position is missing, `Stack` for an inferred
+  branch stack. It is not a level marker.
 
 ### Test hooks
 
-Levels are part of the UI contract, so the hooks must match the rendered level:
-
-- `data-in-stack` — `"true"` on every row that belongs to a stack.
-- `data-stack-depth` — 0-based depth, present on every row (`0` for a standalone
-  pull request and for the bottom rung).
-- `data-stack-level` — the rendered 1-based level (`depth + 1`), present only on
-  stacked rows so a row whose parent is filtered out does not claim level 1.
-- `data-testid="stack-level"` — the visible `L<n>` marker, matching
-  `data-stack-level`.
+- `data-in-stack` — `"true"` on every row that belongs to a stack, including a
+  base row whose children are in view.
+- `data-stack-depth` — 0-based depth on every row (`0` for a standalone pull
+  request and for the base of a stack).
+- `data-stack-children` — how many rows a collapse of this row would hide;
+  absent when the row has no toggle.
+- `data-stack-expanded` — `"true"` or `"false"` on a row with a toggle.
+- `data-testid="stack-toggle"` — the disclosure button; its `aria-expanded`
+  matches `data-stack-expanded`.
 - `data-stack-position`, `data-stack-size`, `data-stack-base`,
   `data-stack-inferred` — on the pill, matching its visible label.
 
@@ -291,10 +268,10 @@ Before opening a UI pull request:
 - [ ] 200% zoom, 200% text-only zoom and 320px reflow were considered.
 - [ ] Touch targets are at least `1.5rem`, with `2.75rem` for primary touch
       actions.
-- [ ] Every stacked row is readable without its indent: the `L<n>` marker keeps
-      counting past the depth cap, and its `sr-only` sentence agrees with it.
-- [ ] `data-stack-depth` is 0-based, `data-stack-level` is `depth + 1` and the
-      visible marker matches both; the pill and the marker never contradict.
+- [ ] A stack starts collapsed; opening a row reveals one level, closing it
+      hides the whole subtree, and hidden rows are not in the list.
+- [ ] `data-stack-depth`, `data-stack-children` and the toggle's
+      `aria-expanded` match what is rendered.
 - [ ] `prefers-reduced-motion` is honored.
 - [ ] Tests are updated and `npm run check` plus `npm run factory -- eval` pass.
 - [ ] The token still lives only in `localStorage` and is sent only to the

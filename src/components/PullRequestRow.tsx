@@ -27,6 +27,13 @@ interface Props {
    * pull request or the base of a stack, which renders flush with the list.
    */
   stackDepth?: number;
+  /**
+   * How many rows sit below this one and would disappear if it collapsed. 0
+   * means the row has no stack to open, so it gets no toggle.
+   */
+  stackChildren?: number;
+  stackExpanded?: boolean;
+  onToggleStack?: () => void;
   selected: boolean;
   onSelect: () => void;
   onMarkSeen: (key: string) => void;
@@ -37,18 +44,18 @@ export function PullRequestRow({
   kind,
   viewerLogin,
   stackDepth = 0,
+  stackChildren = 0,
+  stackExpanded = false,
+  onToggleStack,
   selected,
   onSelect,
   onMarkSeen,
 }: Props) {
   const stacked = stackDepth > 0;
-  // A row's level is 1-based: level 1 sits directly on `main`, level 2 sits on
-  // level 1. The indent is capped by CSS for reflow, so the visible `L<n>`
-  // marker — not the offset — is what keeps deep rungs distinguishable.
-  const level = stackDepth + 1;
-  const stackSize = pr.stack?.size ?? 0;
-  const levelText =
-    stackSize >= level ? `Level ${level} of ${stackSize}` : `Level ${level}`;
+  const hasStack = stackChildren > 0;
+  const toggleLabel = `${stackExpanded ? "Hide" : "Show"} ${stackChildren} stacked ${
+    stackChildren === 1 ? "pull request" : "pull requests"
+  }`;
 
   // Opening or selecting a pull request is reading it, so any click on the row
   // clears its "new" activity. Focus alone does not: tabbing through the list
@@ -66,10 +73,11 @@ export function PullRequestRow({
       data-testid="pr-row"
       data-pr-key={pr.key}
       data-readiness={kind === "mine" ? pr.readiness.state : undefined}
-      data-in-stack={pr.stack ? "true" : "false"}
+      data-in-stack={pr.stack || hasStack ? "true" : "false"}
       data-base-ref={pr.baseRefName || undefined}
       data-stack-depth={stackDepth}
-      data-stack-level={stacked ? level : undefined}
+      data-stack-children={hasStack ? stackChildren : undefined}
+      data-stack-expanded={hasStack ? String(stackExpanded) : undefined}
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
@@ -82,20 +90,33 @@ export function PullRequestRow({
     >
       <div className="pr-main">
         <div className="pr-meta">
+          {hasStack ? (
+            <button
+              type="button"
+              className="stack-toggle"
+              data-testid="stack-toggle"
+              aria-expanded={stackExpanded}
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleStack?.();
+              }}
+            >
+              <span className="stack-chevron" aria-hidden="true">
+                ▸
+              </span>
+              <span className="stack-toggle-label" aria-hidden="true">
+                {stackChildren} stacked
+              </span>
+            </button>
+          ) : null}
           {stacked ? (
             <>
               <span className="stack-elbow" aria-hidden="true">
                 ↳
               </span>
-              <span
-                className="stack-level"
-                data-testid="stack-level"
-                aria-hidden="true"
-                title={levelText}
-              >
-                L{level}
-              </span>
-              <span className="sr-only">{levelText}, stacked under the pull request above.</span>
+              <span className="sr-only">Stacked under the pull request above.</span>
             </>
           ) : null}
           <span className="repo" data-testid="pr-repo">

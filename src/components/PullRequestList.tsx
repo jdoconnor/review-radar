@@ -3,6 +3,7 @@ import type { RefObject } from "react";
 import type { GithubError } from "../lib/github";
 import {
   countMergeReadiness,
+  expandStackRows,
   filterSummaries,
   groupStackRows,
   sortForAttention,
@@ -108,15 +109,38 @@ export function PullRequestList({
   }, [heldKeys, visible, rowsByKey]);
 
   // A stack reads as one unit: its base-most visible rung keeps the place the
-  // sort gave it and the rungs stacked on it follow, indented, right below.
+  // sort gave it and the rungs stacked on it follow directly below, indented.
+  // Every stack starts collapsed, so the queue stays short until a reader opens
+  // the level they want. Expansion is keyed by pull request, so a poll or a
+  // re-sort does not close the levels the reader opened.
   const displayed = useMemo(() => groupStackRows(shown), [shown]);
-  const ordered = useMemo(() => displayed.map((row) => row.pr), [displayed]);
+  const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const visibleRows = useMemo(
+    () => expandStackRows(displayed, expandedKeys),
+    [displayed, expandedKeys],
+  );
+  const ordered = useMemo(() => visibleRows.map((row) => row.pr), [visibleRows]);
+
+  const toggleStack = (key: string): void => {
+    const next = new Set(expandedKeys);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setExpandedKeys(next);
+    if (!next.has(key)) {
+      // Collapsing can hide the selected row; keep the selection on the rung
+      // that closed instead of losing it somewhere off screen.
+      const stillVisible = expandStackRows(displayed, next).some(
+        (row) => row.pr.key === selectedKey,
+      );
+      if (selectedKey && !stillVisible) setSelectedKey(key);
+    }
+  };
 
   const readinessCounts = useMemo(() => countMergeReadiness(shown), [shown]);
 
   useEffect(() => {
-    if (selectedKey && !shown.some((item) => item.key === selectedKey)) setSelectedKey(null);
-  }, [shown, selectedKey]);
+    if (selectedKey && !ordered.some((item) => item.key === selectedKey)) setSelectedKey(null);
+  }, [ordered, selectedKey]);
 
   // Filters and sort are the user's own changes, not a poll landing under the
   // cursor, so they may rearrange the list immediately.
@@ -287,13 +311,16 @@ export function PullRequestList({
           onPointerEnter={() => setHeldKeys((current) => current ?? visible.map((pr) => pr.key))}
           onPointerLeave={() => setHeldKeys(null)}
         >
-          {displayed.map(({ pr, depth }) => (
+          {visibleRows.map(({ pr, depth, childKeys, descendants }) => (
             <PullRequestRow
               key={pr.key}
               pr={pr}
               kind={kind}
               viewerLogin={viewerLogin}
               stackDepth={depth}
+              stackChildren={childKeys.length > 0 ? descendants : 0}
+              stackExpanded={expandedKeys.has(pr.key)}
+              onToggleStack={() => toggleStack(pr.key)}
               selected={selectedKey === pr.key}
               onSelect={() => setSelectedKey(pr.key)}
               onMarkSeen={onMarkSeen}

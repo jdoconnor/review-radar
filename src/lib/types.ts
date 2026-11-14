@@ -246,12 +246,16 @@ export interface PullRequestSummary {
 }
 
 /**
- * One rendered queue row: a pull request plus how many rungs deep it sits in a
- * stack. A depth of 0 is a standalone pull request or the base of a stack.
+ * One queue row: a pull request plus how many rungs deep it sits in a stack. A
+ * depth of 0 is a standalone pull request or the base of a stack.
  */
 export interface StackedRow {
   pr: PullRequestSummary;
   depth: number;
+  /** Keys of the rows stacked directly on this one, in display order. */
+  childKeys: string[];
+  /** How many rows a collapse of this row would hide, at every level below it. */
+  descendants: number;
 }
 
 export interface ViewerPayload {
