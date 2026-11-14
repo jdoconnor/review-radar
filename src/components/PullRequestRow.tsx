@@ -42,6 +42,13 @@ export function PullRequestRow({
   onMarkSeen,
 }: Props) {
   const stacked = stackDepth > 0;
+  // A row's level is 1-based: level 1 sits directly on `main`, level 2 sits on
+  // level 1. The indent is capped by CSS for reflow, so the visible `L<n>`
+  // marker — not the offset — is what keeps deep rungs distinguishable.
+  const level = stackDepth + 1;
+  const stackSize = pr.stack?.size ?? 0;
+  const levelText =
+    stackSize >= level ? `Level ${level} of ${stackSize}` : `Level ${level}`;
 
   // Opening or selecting a pull request is reading it, so any click on the row
   // clears its "new" activity. Focus alone does not: tabbing through the list
@@ -62,6 +69,7 @@ export function PullRequestRow({
       data-in-stack={pr.stack ? "true" : "false"}
       data-base-ref={pr.baseRefName || undefined}
       data-stack-depth={stackDepth}
+      data-stack-level={stacked ? level : undefined}
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
@@ -79,7 +87,15 @@ export function PullRequestRow({
               <span className="stack-elbow" aria-hidden="true">
                 ↳
               </span>
-              <span className="sr-only">Stacked under the pull request above.</span>
+              <span
+                className="stack-level"
+                data-testid="stack-level"
+                aria-hidden="true"
+                title={levelText}
+              >
+                L{level}
+              </span>
+              <span className="sr-only">{levelText}, stacked under the pull request above.</span>
             </>
           ) : null}
           <span className="repo" data-testid="pr-repo">

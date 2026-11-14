@@ -183,7 +183,101 @@ done.
 - Never add a new network destination or send the GitHub token anywhere except
   the configured GraphQL host. That is a security rule as well as a design rule.
 
-## 5. Review checklist
+## 5. Stack levels
+
+A stack is a chain of pull requests where each rung targets the branch of the
+rung below it. Only the bottom rung targets a stable branch (`main`, `staging`)
+and can merge first. A reader has to be able to answer three questions from one
+glance at a row:
+
+- Is this pull request part of a stack?
+- Which level of the stack is it on?
+- What is it waiting on?
+
+### Numbering
+
+Define the level in user-facing terms, and keep it consistent with the data
+attribute.
+
+| Level | Base branch |
+| --- | --- |
+| 1 | `main` (or another stable branch) |
+| 2 | the head branch of the level 1 pull request |
+| N | the head branch of the level N−1 pull request |
+
+`data-stack-depth` stays 0-based because level 1 is the base-most row and
+renders flush with the list; while the whole stack is visible the displayed
+level is `depth + 1`. When a filter hides the rungs below, the offset restarts
+at the first visible rung but the level label keeps the stack's own position, so
+the label is the only cue that still counts correctly. A standalone pull request
+targeting `main` is level 1 and must not show an elbow, a stack pill or
+indentation. A pull request whose base is a non-stable branch is always level 2
+or deeper, even when GitHub reports no native stack.
+
+### Visual encoding
+
+Indentation is the fastest cue and the one that breaks first. At 320 CSS px, in
+a right-to-left layout, at 200% zoom, in a screen reader and in a printout an
+indent is weak or invisible; past the depth cap two different levels render
+identically. Treat indentation as a hint and make the label the truth: every
+stacked row carries at least two cues, one of them non-spatial.
+
+1. **Placement.** The base-most visible rung keeps the position the sort gave
+   it; every rung above it follows directly beneath, in level order. A poll or a
+   re-sort must not scatter a stack through the queue.
+2. **Indent.** One step of `1.25rem` per level using `margin-inline-start`, so
+   right-to-left layouts mirror it. Cap the *offset* at three steps so a long
+   stack still reflows. The cap is a layout concession, not permission to stop
+   counting levels.
+3. **Elbow and level marker.** A `↳` glyph at the start of the meta line, then
+   an `L<n>` marker for the row's level. Both are `aria-hidden`; `sr-only` text
+   names the level: “Level 2 of 3, stacked under the pull request above.” The
+   marker keeps counting past the indent cap, so rungs 4 and 5 never look
+   identical.
+4. **Stack pill.** The pill reports what GitHub knows: `Stack 2/3` for a native
+   stack, `Stack · 3 PRs` when the position is missing, `Stack` for an inferred
+   branch stack. It answers “is this a stack and where in GitHub's stack am I”,
+   not “what level is it here”; the marker is the level, so a filtered-out
+   parent cannot make two labels disagree. Never show a count in place of a
+   level, and never show a level in place of an invented total.
+5. **Floor.** The stack's base row is the unmarked rung its children hang from,
+   and it targets `main` (or another stable branch). A rung whose parent is
+   filtered out of the view keeps its `Stacked on <branch>` text; it must not
+   claim to target `main` just because it now sorts on its own.
+
+### Accessibility and interaction
+
+- The level marker is text, never only an indent or a color. It is
+  `aria-hidden` and paired with an `sr-only` sentence, so sighted and
+  screen-reader users get the same level.
+- The pill is a `role="img"` with an `aria-label` that repeats its position, the
+  total when known, and the base branch. Do not rely on the tooltip: it is not
+  available to touch or keyboard-only users.
+- A stack moves as one block under `j`/`k`; arrow keys are not repurposed. The
+  focused row keeps a visible focus ring, and its indent uses `scroll-margin` so
+  the ring is not clipped at the start edge.
+- Indentation reduces the usable width of a row. At 320 CSS px the capped offset
+  must still leave the title and the status icons legible, and long titles wrap
+  rather than overflow.
+- If a vertical guide rail is added beside the indent, draw it with a border
+  token that meets 3:1 in both themes and survives `forced-colors`; never use a
+  background image, and never encode the level in color alone.
+
+### Test hooks
+
+Levels are part of the UI contract, so the hooks must match the rendered level:
+
+- `data-in-stack` — `"true"` on every row that belongs to a stack.
+- `data-stack-depth` — 0-based depth, present on every row (`0` for a standalone
+  pull request and for the bottom rung).
+- `data-stack-level` — the rendered 1-based level (`depth + 1`), present only on
+  stacked rows so a row whose parent is filtered out does not claim level 1.
+- `data-testid="stack-level"` — the visible `L<n>` marker, matching
+  `data-stack-level`.
+- `data-stack-position`, `data-stack-size`, `data-stack-base`,
+  `data-stack-inferred` — on the pill, matching its visible label.
+
+## 6. Review checklist
 
 Before opening a UI pull request:
 
@@ -197,12 +291,16 @@ Before opening a UI pull request:
 - [ ] 200% zoom, 200% text-only zoom and 320px reflow were considered.
 - [ ] Touch targets are at least `1.5rem`, with `2.75rem` for primary touch
       actions.
+- [ ] Every stacked row is readable without its indent: the `L<n>` marker keeps
+      counting past the depth cap, and its `sr-only` sentence agrees with it.
+- [ ] `data-stack-depth` is 0-based, `data-stack-level` is `depth + 1` and the
+      visible marker matches both; the pill and the marker never contradict.
 - [ ] `prefers-reduced-motion` is honored.
 - [ ] Tests are updated and `npm run check` plus `npm run factory -- eval` pass.
 - [ ] The token still lives only in `localStorage` and is sent only to the
       configured GitHub GraphQL host.
 
-## 6. Exceptions and migration
+## 7. Exceptions and migration
 
 - If `px` is genuinely required, keep the scope as small as possible and add a
   comment explaining why.

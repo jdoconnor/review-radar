@@ -463,9 +463,10 @@ select:focus {
 
 /*
  * A pull request stacked on another is bound to the rung above it: it is
- * indented and starts with an elbow, so a stack reads as one unit instead of a
- * run of unrelated cards. Depth stops growing after three rungs so a long stack
- * still reflows on a narrow screen.
+ * indented and starts with an elbow and an `L<n>` marker, so a stack reads as
+ * one unit instead of a run of unrelated cards. The offset stops growing after
+ * three rungs so a long stack still reflows on a narrow screen; the marker keeps
+ * counting past the cap, because the level must not depend on available width.
  */
 .pr-row.stacked-row {
   margin-inline-start: calc(min(var(--stack-depth, 1), 3) * 1.25rem);
@@ -474,6 +475,21 @@ select:focus {
 .stack-elbow {
   color: var(--faint);
   line-height: 1;
+}
+
+/*
+ * The level marker is text, not a color or an indent, so it survives the offset
+ * cap, high-contrast mode and a screen reader reading the list in order.
+ */
+.stack-level {
+  padding: 0 0.3em;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.25rem;
+  color: var(--accent-strong);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
 }
 
 .pr-main {
