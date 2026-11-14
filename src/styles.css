@@ -341,40 +341,6 @@
     line-height: 1;
   }
 
-  /*
-   * The toggle is text, not a bare chevron: the count survives the console, a
-   * screenshot and a screen reader. The chevron is decoration and the button's
-   * aria-expanded carries the open/closed state.
-   */
-  .stack-toggle {
-    gap: 0.3em;
-    min-height: 1.5rem;
-    padding: 0 0.45em;
-    border-radius: 0.35rem;
-    font-family: var(--mono);
-    font-size: 0.6875rem;
-    line-height: 1;
-  }
-
-  .stack-toggle:focus-visible {
-    outline: 0.125rem solid var(--accent);
-    outline-offset: 0.0625rem;
-  }
-
-  .stack-chevron {
-    display: inline-block;
-    transition: transform 120ms ease;
-  }
-
-  .stack-toggle[aria-expanded="true"] .stack-chevron {
-    transform: rotate(90deg);
-  }
-
-  .stack-toggle-label {
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0.01em;
-  }
-
   .pr-main {
     min-width: 0;
     flex: 1;
@@ -827,7 +793,7 @@
 
     .workspace {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       align-items: start;
       gap: 1.5rem;
     }

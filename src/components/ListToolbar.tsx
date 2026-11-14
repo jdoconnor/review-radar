@@ -82,7 +82,7 @@ export function ListToolbar({
     >
       <input
         ref={searchRef}
-        className="input input-sm min-w-44 grow basis-64"
+        className="input input-sm min-w-0 max-w-[calc(20ch+1.5rem)] flex-1"
         type="search"
         placeholder="Filter pull requests…"
         value={filters.text}
@@ -91,7 +91,7 @@ export function ListToolbar({
         data-testid="filter-text"
       />
       <select
-        className="select select-sm"
+        className="select select-sm w-auto max-w-52"
         value={filters.repo}
         onChange={(event) => onFiltersChange({ ...filters, repo: event.target.value })}
         aria-label="Filter by repository"
@@ -105,7 +105,7 @@ export function ListToolbar({
         ))}
       </select>
       <select
-        className="select select-sm"
+        className="select select-sm w-auto"
         value={sort}
         onChange={(event) => onSortChange(event.target.value as SortOrder)}
         aria-label="Sort pull requests"
