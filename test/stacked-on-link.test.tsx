@@ -118,6 +118,11 @@ async function openMine(nodes: PullRequestNode[]): Promise<void> {
   await screen.findByText(nodes[0]!.title);
 }
 
+/** Stacks start collapsed, so open the level that holds the row under test. */
+async function expandStack(title: string): Promise<void> {
+  await userEvent.click(within(rowFor(title)).getByTestId("stack-toggle"));
+}
+
 beforeEach(async () => {
   await clearCache();
   localStorage.clear();
@@ -132,6 +137,7 @@ afterEach(() => {
 describe("the stack message on a waiting pull request", () => {
   it("links to the pull request whose head branch it merges into", async () => {
     await openMine([PARENT, CHILD]);
+    await expandStack("Bottom of a stack");
 
     const pill = within(rowFor("Stacked on the parent")).getByTestId("merge-readiness");
     expect(pill).toHaveTextContent("Waiting: Stacked on #89");
@@ -145,6 +151,7 @@ describe("the stack message on a waiting pull request", () => {
 
   it("is reachable by keyboard", async () => {
     await openMine([PARENT, CHILD]);
+    await expandStack("Bottom of a stack");
 
     const link = within(rowFor("Stacked on the parent")).getByTestId("stacked-on-link");
     link.focus();

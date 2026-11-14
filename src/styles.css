@@ -462,11 +462,11 @@ select:focus {
 }
 
 /*
- * A pull request stacked on another is bound to the rung above it: it is
- * indented and starts with an elbow and an `L<n>` marker, so a stack reads as
- * one unit instead of a run of unrelated cards. The offset stops growing after
- * three rungs so a long stack still reflows on a narrow screen; the marker keeps
- * counting past the cap, because the level must not depend on available width.
+ * A stack starts collapsed. Its base row carries a toggle that says how many
+ * rungs it hides; opening it reveals the next level, still collapsed. Rows
+ * below the base are indented and start with an elbow, so an open stack reads
+ * as one unit instead of a run of unrelated cards. Depth stops growing after
+ * three rungs so a long stack still reflows on a narrow screen.
  */
 .pr-row.stacked-row {
   margin-inline-start: calc(min(var(--stack-depth, 1), 3) * 1.25rem);
@@ -478,18 +478,48 @@ select:focus {
 }
 
 /*
- * The level marker is text, not a color or an indent, so it survives the offset
- * cap, high-contrast mode and a screen reader reading the list in order.
+ * The toggle is text, not a bare chevron: the count survives the console, a
+ * screenshot and a screen reader. The chevron is decoration and the button's
+ * aria-expanded carries the open/closed state.
  */
-.stack-level {
-  padding: 0 0.3em;
-  border: 1px solid var(--border-strong);
-  border-radius: 0.25rem;
-  color: var(--accent-strong);
+.stack-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  min-height: 1.5rem;
+  padding: 0 0.45em;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
   font-size: 0.6875rem;
-  font-weight: 650;
-  line-height: 1.45;
-  letter-spacing: 0.02em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stack-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.stack-toggle:focus-visible {
+  outline: 0.125rem solid var(--accent);
+  outline-offset: 0.0625rem;
+}
+
+.stack-chevron {
+  display: inline-block;
+  transition: transform 120ms ease;
+}
+
+.stack-toggle[aria-expanded="true"] .stack-chevron {
+  transform: rotate(90deg);
+}
+
+.stack-toggle-label {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .pr-main {

@@ -1,9 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { App } from "../src/App";
 import { clearCache } from "../src/lib/cache";
-import { groupStackRows, pullRequestKey, stackParents, toSummary } from "../src/lib/normalize";
-import type { PullRequestNode, PullRequestSummary } from "../src/lib/types";
+import {
+  expandStackRows,
+  groupStackRows,
+  pullRequestKey,
+  stackParents,
+  toSummary,
+} from "../src/lib/normalize";
+import type { PullRequestNode, PullRequestSummary, StackedRow } from "../src/lib/types";
 import { makePr } from "./fixtures";
 
 /**
@@ -87,7 +94,7 @@ const STANDALONE = makePr({
   createdAt: "2026-10-17T09:00:00.000Z",
 });
 
-function keys(rows: Array<{ pr: PullRequestSummary; depth: number }>): string[] {
+function keys(rows: Array<Pick<StackedRow, "pr" | "depth">>): string[] {
   return rows.map((row) => `#${row.pr.number}:${row.depth}`);
 }
 
@@ -139,6 +146,40 @@ describe("groupStackRows", () => {
 
     expect(keys(rows)).toEqual(["#80:0", "#81:1"]);
   });
+
+  it("counts the rungs a collapse would hide", () => {
+    const [base, child, grandchild] = groupStackRows(summaries([GRANDCHILD, CHILD, BASE]));
+
+    expect(base?.descendants).toBe(2);
+    expect(base?.childKeys).toEqual([child?.pr.key]);
+    expect(child?.descendants).toBe(1);
+    expect(grandchild?.descendants).toBe(0);
+  });
+});
+
+describe("expandStackRows", () => {
+  it("starts with every stack collapsed to its base rung", () => {
+    const rows = groupStackRows(summaries([GRANDCHILD, CHILD, BASE]));
+
+    expect(keys(expandStackRows(rows, new Set()))).toEqual(["#70:0"]);
+  });
+
+  it("opens one level at a time", () => {
+    const rows = groupStackRows(summaries([GRANDCHILD, CHILD, BASE]));
+    const [base, child] = rows;
+
+    const baseOpen = expandStackRows(rows, new Set([base!.pr.key]));
+    expect(keys(baseOpen)).toEqual(["#70:0", "#71:1"]);
+
+    const bothOpen = expandStackRows(rows, new Set([base!.pr.key, child!.pr.key]));
+    expect(keys(bothOpen)).toEqual(["#70:0", "#71:1", "#72:2"]);
+  });
+
+  it("leaves standalone pull requests visible", () => {
+    const rows = groupStackRows(summaries([STANDALONE, BASE]));
+
+    expect(keys(expandStackRows(rows, new Set()))).toEqual(["#73:0", "#70:0"]);
+  });
 });
 
 function stubFetch(nodes: PullRequestNode[]): void {
@@ -183,59 +224,80 @@ afterEach(() => {
 });
 
 describe("a stack in the review queue", () => {
-  it("renders the rungs together and indents each one under its parent", async () => {
+  it("collapses a stack to its base row until the reader opens a level", async () => {
+    const user = userEvent.setup();
     // Oldest-first would put the standalone first, then the child, then the
     // parent. Grouping keeps the child beneath its parent instead.
     const child = { ...CHILD, createdAt: "2026-10-16T09:00:00.000Z" };
-    stubFetch([STANDALONE, child, BASE]);
+    stubFetch([STANDALONE, GRANDCHILD, child, BASE]);
 
     render(<App />);
     await screen.findByText("Base of the stack");
 
+    expect(renderedTitles()).toEqual(["Standalone pull request", "Base of the stack"]);
+
+    const [standaloneRow, baseRow] = screen.getAllByTestId("pr-row");
+    expect(standaloneRow).toHaveAttribute("data-stack-depth", "0");
+    expect(standaloneRow).not.toHaveAttribute("data-stack-children");
+    expect(standaloneRow).not.toHaveAttribute("data-in-stack", "true");
+    expect(within(standaloneRow as HTMLElement).queryByTestId("stack-toggle")).toBeNull();
+
+    expect(baseRow).toHaveAttribute("data-stack-depth", "0");
+    expect(baseRow).toHaveAttribute("data-stack-children", "2");
+    expect(baseRow).toHaveAttribute("data-stack-expanded", "false");
+    const baseToggle = within(baseRow as HTMLElement).getByTestId("stack-toggle");
+    expect(baseToggle).toHaveAttribute("aria-expanded", "false");
+    expect(baseToggle).toHaveTextContent("2 stacked");
+    expect(baseToggle).toHaveAccessibleName("Show 2 stacked pull requests");
+
+    // One click opens only the next level; the level above stays collapsed.
+    await user.click(baseToggle);
     expect(renderedTitles()).toEqual([
       "Standalone pull request",
       "Base of the stack",
       "Child of the stack",
     ]);
+    expect(baseToggle).toHaveAttribute("aria-expanded", "true");
+    expect(baseToggle).toHaveAccessibleName("Hide 2 stacked pull requests");
 
-    const [standaloneRow, baseRow, childRow] = screen.getAllByTestId("pr-row");
-    expect(standaloneRow).toHaveAttribute("data-stack-depth", "0");
-    expect(baseRow).toHaveAttribute("data-stack-depth", "0");
+    const childRow = screen.getByText("Child of the stack").closest('[data-testid="pr-row"]');
     expect(childRow).toHaveAttribute("data-stack-depth", "1");
-    expect(childRow).toHaveAttribute("data-stack-level", "2");
-    expect(standaloneRow).not.toHaveAttribute("data-stack-level");
-    expect(within(childRow as HTMLElement).getByTestId("stack-level")).toHaveTextContent("L2");
-    expect(
-      within(childRow as HTMLElement).getByText(
-        "Level 2, stacked under the pull request above.",
-      ),
-    ).toBeInTheDocument();
     expect(childRow).toHaveClass("stacked-row");
-    expect(baseRow).not.toHaveClass("stacked-row");
+    expect(childRow).toHaveAttribute("data-stack-children", "1");
+
+    await user.click(within(childRow as HTMLElement).getByTestId("stack-toggle"));
+    expect(renderedTitles()).toEqual([
+      "Standalone pull request",
+      "Base of the stack",
+      "Child of the stack",
+      "Tip of the stack",
+    ]);
+
+    // Collapsing the base hides every level below it again.
+    await user.click(baseToggle);
+    expect(renderedTitles()).toEqual(["Standalone pull request", "Base of the stack"]);
   });
 
-  it("keeps counting levels past the indent cap", async () => {
-    // The CSS offset stops at three steps so the list reflows on a narrow
-    // screen; the marker has to keep counting or rungs 4 and 5 look identical.
-    const fourthRung = makePr({
-      id: "fourth-rung",
-      number: 74,
-      title: "Fourth rung of the stack",
-      url: "https://github.com/jdoconnor/review-radar/pull/74",
-      headRefName: "feat/fourth",
-      baseRefName: "feat/grandchild",
-      stack: null,
-      stackEntry: null,
-      createdAt: "2026-10-21T09:00:00.000Z",
-    });
-    stubFetch([fourthRung, GRANDCHILD, CHILD, BASE]);
+  it("keeps keyboard navigation inside the open levels", async () => {
+    const user = userEvent.setup();
+    stubFetch([GRANDCHILD, CHILD, BASE]);
 
     render(<App />);
-    await screen.findByText("Fourth rung of the stack");
+    await screen.findByText("Base of the stack");
 
-    const fourthRow = screen.getByText("Fourth rung of the stack").closest('[data-testid="pr-row"]');
-    expect(fourthRow).toHaveAttribute("data-stack-depth", "3");
-    expect(fourthRow).toHaveAttribute("data-stack-level", "4");
-    expect(within(fourthRow as HTMLElement).getByTestId("stack-level")).toHaveTextContent("L4");
+    // With the stack closed, j moves between roots, never into a hidden rung.
+    await user.keyboard("j");
+    expect(screen.getByText("Base of the stack").closest('[data-testid="pr-row"]')).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+
+    await user.click(screen.getByTestId("stack-toggle"));
+    await user.keyboard("j");
+    expect(screen.getByText("Child of the stack").closest('[data-testid="pr-row"]')).toHaveAttribute(
+      "data-selected",
+      "true",
+    );
+    expect(screen.queryByText("Tip of the stack")).toBeNull();
   });
 });
