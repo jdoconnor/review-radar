@@ -93,7 +93,7 @@ export function PullRequestRow({
           {hasStack ? (
             <button
               type="button"
-              className="btn btn-xs btn-outline stack-toggle"
+              className="btn btn-xs btn-outline group"
               data-testid="stack-toggle"
               aria-expanded={stackExpanded}
               aria-label={toggleLabel}
@@ -103,10 +103,13 @@ export function PullRequestRow({
                 onToggleStack?.();
               }}
             >
-              <span className="stack-chevron" aria-hidden="true">
+              <span
+                className="inline-block transition-transform group-aria-expanded:rotate-90"
+                aria-hidden="true"
+              >
                 ▸
               </span>
-              <span className="stack-toggle-label" aria-hidden="true">
+              <span className="tabular-nums" aria-hidden="true">
                 {stackChildren} stacked
               </span>
             </button>
