@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { App } from "../src/App";
 import { clearCache } from "../src/lib/cache";
 import { groupStackRows, pullRequestKey, stackParents, toSummary } from "../src/lib/normalize";
@@ -202,7 +202,40 @@ describe("a stack in the review queue", () => {
     expect(standaloneRow).toHaveAttribute("data-stack-depth", "0");
     expect(baseRow).toHaveAttribute("data-stack-depth", "0");
     expect(childRow).toHaveAttribute("data-stack-depth", "1");
+    expect(childRow).toHaveAttribute("data-stack-level", "2");
+    expect(standaloneRow).not.toHaveAttribute("data-stack-level");
+    expect(within(childRow as HTMLElement).getByTestId("stack-level")).toHaveTextContent("L2");
+    expect(
+      within(childRow as HTMLElement).getByText(
+        "Level 2, stacked under the pull request above.",
+      ),
+    ).toBeInTheDocument();
     expect(childRow).toHaveClass("stacked-row");
     expect(baseRow).not.toHaveClass("stacked-row");
+  });
+
+  it("keeps counting levels past the indent cap", async () => {
+    // The CSS offset stops at three steps so the list reflows on a narrow
+    // screen; the marker has to keep counting or rungs 4 and 5 look identical.
+    const fourthRung = makePr({
+      id: "fourth-rung",
+      number: 74,
+      title: "Fourth rung of the stack",
+      url: "https://github.com/jdoconnor/review-radar/pull/74",
+      headRefName: "feat/fourth",
+      baseRefName: "feat/grandchild",
+      stack: null,
+      stackEntry: null,
+      createdAt: "2026-10-21T09:00:00.000Z",
+    });
+    stubFetch([fourthRung, GRANDCHILD, CHILD, BASE]);
+
+    render(<App />);
+    await screen.findByText("Fourth rung of the stack");
+
+    const fourthRow = screen.getByText("Fourth rung of the stack").closest('[data-testid="pr-row"]');
+    expect(fourthRow).toHaveAttribute("data-stack-depth", "3");
+    expect(fourthRow).toHaveAttribute("data-stack-level", "4");
+    expect(within(fourthRow as HTMLElement).getByTestId("stack-level")).toHaveTextContent("L4");
   });
 });

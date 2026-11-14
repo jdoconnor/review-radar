@@ -229,22 +229,28 @@ stacked row carries at least two cues, one of them non-spatial.
    right-to-left layouts mirror it. Cap the *offset* at three steps so a long
    stack still reflows. The cap is a layout concession, not permission to stop
    counting levels.
-3. **Elbow.** A `↳` glyph at the start of the meta line, `aria-hidden`, paired
-   with `sr-only` text that names the level: “Level 2 of 3, stacked under the
-   pull request above.”
-4. **Level label.** A pill that keeps counting past the indent cap: `Stack 2/3`
-   when GitHub reports a native stack. When the stack is inferred from a base
-   branch and the total is unknown, show the visible level and the base branch
-   (`Stack · level 2 · targets feat/base`) rather than inventing a total.
-   `Stack · 3 PRs` is not a level and must not replace one.
-5. **Floor.** A level 1 row says what it targets (`targets main`) so the reader
-   knows where the merge order starts. A rung whose parent is filtered out of
-   the view keeps its `Stacked on <branch>` text; it must not claim to target
-   `main` just because it now sorts on its own.
+3. **Elbow and level marker.** A `↳` glyph at the start of the meta line, then
+   an `L<n>` marker for the row's level. Both are `aria-hidden`; `sr-only` text
+   names the level: “Level 2 of 3, stacked under the pull request above.” The
+   marker keeps counting past the indent cap, so rungs 4 and 5 never look
+   identical.
+4. **Stack pill.** The pill reports what GitHub knows: `Stack 2/3` for a native
+   stack, `Stack · 3 PRs` when the position is missing, `Stack` for an inferred
+   branch stack. It answers “is this a stack and where in GitHub's stack am I”,
+   not “what level is it here”; the marker is the level, so a filtered-out
+   parent cannot make two labels disagree. Never show a count in place of a
+   level, and never show a level in place of an invented total.
+5. **Floor.** The stack's base row is the unmarked rung its children hang from,
+   and it targets `main` (or another stable branch). A rung whose parent is
+   filtered out of the view keeps its `Stacked on <branch>` text; it must not
+   claim to target `main` just because it now sorts on its own.
 
 ### Accessibility and interaction
 
-- The pill is a `role="img"` with an `aria-label` that repeats the level, the
+- The level marker is text, never only an indent or a color. It is
+  `aria-hidden` and paired with an `sr-only` sentence, so sighted and
+  screen-reader users get the same level.
+- The pill is a `role="img"` with an `aria-label` that repeats its position, the
   total when known, and the base branch. Do not rely on the tooltip: it is not
   available to touch or keyboard-only users.
 - A stack moves as one block under `j`/`k`; arrow keys are not repurposed. The
@@ -264,6 +270,10 @@ Levels are part of the UI contract, so the hooks must match the rendered level:
 - `data-in-stack` — `"true"` on every row that belongs to a stack.
 - `data-stack-depth` — 0-based depth, present on every row (`0` for a standalone
   pull request and for the bottom rung).
+- `data-stack-level` — the rendered 1-based level (`depth + 1`), present only on
+  stacked rows so a row whose parent is filtered out does not claim level 1.
+- `data-testid="stack-level"` — the visible `L<n>` marker, matching
+  `data-stack-level`.
 - `data-stack-position`, `data-stack-size`, `data-stack-base`,
   `data-stack-inferred` — on the pill, matching its visible label.
 
@@ -281,10 +291,10 @@ Before opening a UI pull request:
 - [ ] 200% zoom, 200% text-only zoom and 320px reflow were considered.
 - [ ] Touch targets are at least `1.5rem`, with `2.75rem` for primary touch
       actions.
-- [ ] Every stacked row is readable without its indent: elbow, level label and
-      accessible name agree, and the label keeps counting past the depth cap.
-- [ ] `data-stack-depth` is 0-based and agrees with the rendered indent; the
-      level label agrees with the stack position GitHub reports.
+- [ ] Every stacked row is readable without its indent: the `L<n>` marker keeps
+      counting past the depth cap, and its `sr-only` sentence agrees with it.
+- [ ] `data-stack-depth` is 0-based, `data-stack-level` is `depth + 1` and the
+      visible marker matches both; the pill and the marker never contradict.
 - [ ] `prefers-reduced-motion` is honored.
 - [ ] Tests are updated and `npm run check` plus `npm run factory -- eval` pass.
 - [ ] The token still lives only in `localStorage` and is sent only to the
@@ -297,10 +307,5 @@ Before opening a UI pull request:
 - Existing pixel debt is migrated incrementally: convert the rule you are
   already touching. Do not mix a mass unit rewrite into an unrelated feature.
 - Shadows, `1px` borders and focus-ring strokes are the standing exceptions.
-- Known gaps against §5, to close as stacked rows are touched, not precedents:
-  inferred stacks label themselves `Stack` without a level, and the indent cap
-  makes level 4 and deeper look alike while their pill still shows the native
-  position. A change to stack rendering should fix the level label it is already
-  editing.
 - When unsure, use `rem` for global layout and typography, and `em` for sizing
   that should follow a component's own text.
