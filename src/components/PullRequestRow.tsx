@@ -67,9 +67,9 @@ export function PullRequestRow({
 
   return (
     <article
-      className={`pr-row ${stacked ? "stacked-row" : ""} ${selected ? "selected" : ""} ${
-        kind === "review" ? "needs-review" : `readiness-${pr.readiness.state}`
-      }`}
+      className={`card card-border pr-row ${stacked ? "stacked-row" : ""} ${
+        selected ? "selected" : ""
+      } ${kind === "review" ? "needs-review" : `readiness-${pr.readiness.state}`}`}
       data-testid="pr-row"
       data-pr-key={pr.key}
       data-readiness={kind === "mine" ? pr.readiness.state : undefined}
@@ -93,7 +93,7 @@ export function PullRequestRow({
           {hasStack ? (
             <button
               type="button"
-              className="stack-toggle"
+              className="btn btn-xs btn-outline stack-toggle"
               data-testid="stack-toggle"
               aria-expanded={stackExpanded}
               aria-label={toggleLabel}
@@ -126,7 +126,9 @@ export function PullRequestRow({
             ·
           </span>
           <span className="number">#{pr.number}</span>
-          {kind === "review" ? <span className="review-flag">Needs review</span> : null}
+          {kind === "review" ? (
+            <span className="badge badge-sm badge-primary review-flag">Needs review</span>
+          ) : null}
         </div>
 
         <h2 className="pr-title">
@@ -189,7 +191,7 @@ export function PullRequestRow({
         {kind === "mine" && pr.newActivity > 0 ? (
           <button
             type="button"
-            className="button tiny ghost"
+            className="btn btn-xs btn-ghost"
             data-testid="mark-seen"
             onClick={(event) => {
               event.stopPropagation();

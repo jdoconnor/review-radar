@@ -49,7 +49,7 @@ export function TokenSetup({ onSave, theme, onToggleTheme }: Props) {
       <div className="setup-theme">
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
-      <section className="setup-card" aria-labelledby="setup-title">
+      <section className="card card-border setup-card" aria-labelledby="setup-title">
         <p className="eyebrow">Review Radar</p>
         <h1 id="setup-title">Your review desk, cached locally.</h1>
         <p className="lede">
@@ -58,10 +58,13 @@ export function TokenSetup({ onSave, theme, onToggleTheme }: Props) {
         </p>
 
         <form onSubmit={(event) => void submit(event)} className="setup-form">
-          <label htmlFor="token">GitHub token</label>
+          <label className="label" htmlFor="token">
+            GitHub token
+          </label>
           <input
             id="token"
             name="token"
+            className="input w-full"
             type="password"
             autoComplete="off"
             spellCheck={false}
@@ -84,7 +87,7 @@ export function TokenSetup({ onSave, theme, onToggleTheme }: Props) {
               {error}
             </p>
           ) : null}
-          <button className="button primary" type="submit" disabled={checking}>
+          <button className="btn btn-primary" type="submit" disabled={checking}>
             {checking ? "Checking…" : "Start reviewing"}
           </button>
         </form>

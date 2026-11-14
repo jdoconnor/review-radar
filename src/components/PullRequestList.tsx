@@ -220,18 +220,18 @@ export function PullRequestList({
       {heading ? (
         <div className="list-head">
           <h2>{heading}</h2>
-          <span className="count">{items.length}</span>
+          <span className="badge badge-sm badge-ghost">{items.length}</span>
         </div>
       ) : null}
       {kind === "mine" && visible.length > 0 ? (
         <div className="merge-summary" data-testid="merge-summary">
           {readinessCounts.ready > 0 ? (
-            <span className="pill readiness ready" data-testid="ready-count">
+            <span className="badge badge-sm badge-success" data-testid="ready-count">
               {readinessCounts.ready} ready to merge
             </span>
           ) : null}
           {readinessCounts.waiting > 0 ? (
-            <span className="pill readiness waiting" data-testid="waiting-count">
+            <span className="badge badge-sm badge-ghost" data-testid="waiting-count">
               {readinessCounts.waiting} waiting on something
             </span>
           ) : null}
@@ -239,7 +239,7 @@ export function PullRequestList({
       ) : null}
       {error ? (
         <div
-          className={`banner ${error.kind === "auth" || error.kind === "forbidden" ? "banner-error" : "banner-warn"}`}
+          className={`alert ${error.kind === "auth" || error.kind === "forbidden" ? "alert-error" : "alert-warning"}`}
           role="status"
           data-testid={
             error.kind === "auth"
@@ -273,13 +273,13 @@ export function PullRequestList({
       ) : null}
 
       {warning && !error ? (
-        <div className="banner banner-warn" role="status" data-testid="permission-warning">
+        <div className="alert alert-warning" role="status" data-testid="permission-warning">
           <strong>Limited data.</strong> {warning}
         </div>
       ) : null}
 
       {loading && items.length === 0 ? (
-        <div className="loading-block">
+        <div className="flex items-center justify-center gap-2.5 p-10 text-base-content/70">
           <Spinner label="Loading pull requests" />
           <span>Loading pull requests…</span>
         </div>
