@@ -28,6 +28,7 @@ Walking skeleton on `main`:
   without native GitHub stack metadata, and a stack is never "ready to merge"
 - filters, sorting, keyboard navigation (`j`/`k`/`o`/`m`/`r`/`/`)
 - light and dark themes, defaulting to the system preference
+- daisyUI 5 design system on Tailwind CSS 4, with app themes for both modes
 - error, rate-limit, offline, cached and empty states
 - unit + component tests, production build
 

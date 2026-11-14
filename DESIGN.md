@@ -163,8 +163,20 @@ done.
 
 ## 4. Components and tokens
 
-- Reuse the CSS variables in `src/styles.css` for color, radius, shadow and
-  fonts. Add a token when a value is repeated or needs theme variants.
+The design system is **daisyUI 5** on Tailwind CSS 4. `src/styles.css` registers
+custom `dark` and `light` daisyUI themes that reuse the app's palette and keep
+the existing `data-theme="dark" | "light"` contract, so the no-flash boot script
+in `public/theme.js` and `lib/theme.ts` keep working unchanged.
+
+- Build UI from daisyUI components: `btn`, `badge`, `input`, `select`, `alert`,
+  `card`, `modal`, `tabs` and `loading`. Add app-specific CSS only for layout
+  and behavior that daisyUI does not own.
+- Use daisyUI semantic tokens (`base-100/200/300`, `base-content`,
+  `primary`, `success`, `warning`, `error`, `secondary`) and Tailwind utilities
+  that map to them. Never hard-code a palette value in a component.
+- The theme tokens in `src/styles.css` are the single source of truth for
+  color, radius, shadow and fonts. Add a token when a value is repeated or needs
+  theme variants, and map it into both themes.
 - Spacing scale (in `rem`): `0.25`, `0.5`, `0.75`, `1`, `1.5`, `2`, `3`.
 - Type scale (in `rem`): `0.6875`, `0.75`, `0.8125`, `0.875`, `1`, `1.25`.
 - Radii are in `rem`; use `999rem` for a pill rather than a pixel value.

@@ -4,11 +4,11 @@ import { checkLabel, relativeTime } from "../lib/normalize";
 
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return (
-    <span className="spinner" role="status" aria-label={label}>
-      <span className="spinner-dot" />
-      <span className="spinner-dot" />
-      <span className="spinner-dot" />
-    </span>
+    <span
+      className="loading loading-dots loading-sm text-primary"
+      role="status"
+      aria-label={label}
+    />
   );
 }
 
@@ -22,7 +22,7 @@ export function EmptyState({
   icon?: string;
 }) {
   return (
-    <div className="empty-state" data-testid="empty-state">
+    <div className="card card-border empty-state" data-testid="empty-state">
       <span className="empty-icon" aria-hidden="true">
         {icon}
       </span>
@@ -255,7 +255,7 @@ export function CheckStatus({ state, failing, total }: { state: CheckState; fail
 export function ChangesPill({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="pill changes" data-testid="changes-pill">
+    <span className="badge badge-sm badge-error badge-outline changes" data-testid="changes-pill">
       {count} change{count === 1 ? "" : "s"} requested
     </span>
   );
@@ -264,7 +264,7 @@ export function ChangesPill({ count }: { count: number }) {
 export function NewActivityPill({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="pill fresh" data-testid="new-activity">
+    <span className="badge badge-sm fresh" data-testid="new-activity">
       {count} new
     </span>
   );
@@ -272,7 +272,7 @@ export function NewActivityPill({ count }: { count: number }) {
 
 export function DraftPill() {
   return (
-    <span className="pill draft" data-testid="draft-pill">
+    <span className="badge badge-sm badge-ghost draft" data-testid="draft-pill">
       Draft
     </span>
   );
@@ -317,7 +317,7 @@ export function CommentsStatus({ count }: { count: number }) {
 export function DirectReviewPill({ viewer }: { viewer: string | null }) {
   return (
     <span
-      className="pill direct"
+      className="badge badge-sm badge-info badge-outline direct"
       data-testid="direct-review"
       title={viewer ? `Review requested from @${viewer}` : "Review requested from you"}
     >
@@ -329,7 +329,7 @@ export function DirectReviewPill({ viewer }: { viewer: string | null }) {
 export function TeamReviewPill({ teams }: { teams: string[] }) {
   if (teams.length === 0) return null;
   return (
-    <span className="pill team" data-testid="team-review" title={teams.join(", ")}>
+    <span className="badge badge-sm badge-info badge-outline team" data-testid="team-review" title={teams.join(", ")}>
       Team review
     </span>
   );
@@ -402,7 +402,7 @@ export function StackPill({ stack }: { stack: PullRequestSummary["stack"] }) {
         : "Part of a pull request stack.";
   return (
     <span
-      className={`pill stack${inferred ? " inferred" : ""}`}
+      className={`badge badge-sm badge-info badge-outline stack${inferred ? " inferred" : ""}`}
       data-testid="stack-pill"
       data-stack-number={stack.number || undefined}
       data-stack-size={hasSize ? stack.size : undefined}
@@ -437,7 +437,7 @@ export function MergeReadinessPill({ readiness }: { readiness: MergeReadiness })
     : `Waiting on ${reasons.join(", ")}.`;
   return (
     <span
-      className={`pill readiness ${ready ? "ready" : "waiting"}`}
+      className={`badge badge-sm readiness ${ready ? "ready badge-success" : "waiting badge-ghost"}`}
       data-testid="merge-readiness"
       data-readiness={readiness.state}
       data-blockers={readiness.blockers.join(",")}
@@ -477,7 +477,7 @@ export function LabelChips({ labels }: { labels: PullRequestSummary["labels"] })
       {labels.slice(0, 5).map((label) => (
         <span
           key={label.name}
-          className="label-chip"
+          className="badge badge-xs badge-outline label-chip"
           style={{
             borderColor: `#${label.color}`,
             color: `#${label.color}`,

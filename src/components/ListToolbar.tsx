@@ -82,7 +82,7 @@ export function ListToolbar({
     >
       <input
         ref={searchRef}
-        className="search"
+        className="input input-sm min-w-44 grow basis-64"
         type="search"
         placeholder="Filter pull requests…"
         value={filters.text}
@@ -91,7 +91,7 @@ export function ListToolbar({
         data-testid="filter-text"
       />
       <select
-        className="select"
+        className="select select-sm"
         value={filters.repo}
         onChange={(event) => onFiltersChange({ ...filters, repo: event.target.value })}
         aria-label="Filter by repository"
@@ -105,7 +105,7 @@ export function ListToolbar({
         ))}
       </select>
       <select
-        className="select"
+        className="select select-sm"
         value={sort}
         onChange={(event) => onSortChange(event.target.value as SortOrder)}
         aria-label="Sort pull requests"
@@ -116,10 +116,10 @@ export function ListToolbar({
         <option value="oldest">Oldest first</option>
         <option value="newest">Recently updated</option>
       </select>
-      <div className="chips" role="group" aria-label="Branch state filters">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Branch state filters">
         <button
           type="button"
-          className={`chip ${filters.onlyRebase ? "active" : ""}`}
+          className={`btn btn-xs ${filters.onlyRebase ? "btn-primary" : "btn-outline"}`}
           aria-pressed={filters.onlyRebase}
           title="Only pull requests whose branch is behind its base branch and needs a rebase or update"
           onClick={() => onFiltersChange({ ...filters, onlyRebase: !filters.onlyRebase })}
@@ -129,10 +129,10 @@ export function ListToolbar({
         </button>
       </div>
       {view !== "mine" ? (
-        <div className="chips" role="group" aria-label="Review request filters">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Review request filters">
           <button
             type="button"
-            className={`chip ${filters.onlyDirect ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyDirect ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyDirect}
             title="Only pull requests where a review was requested from you directly"
             onClick={() => onFiltersChange({ ...filters, onlyDirect: !filters.onlyDirect })}
@@ -142,7 +142,7 @@ export function ListToolbar({
           </button>
           <button
             type="button"
-            className={`chip ${filters.onlyTeam ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyTeam ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyTeam}
             title="Only pull requests where a team you belong to was asked to review"
             onClick={() => onFiltersChange({ ...filters, onlyTeam: !filters.onlyTeam })}
@@ -153,10 +153,10 @@ export function ListToolbar({
         </div>
       ) : null}
       {view !== "review" ? (
-        <div className="chips" role="group" aria-label="Quick filters">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick filters">
           <button
             type="button"
-            className={`chip ${filters.onlyNoReviewers ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyNoReviewers ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyNoReviewers}
             title="Only your pull requests with no reviewer requested"
             onClick={() => onFiltersChange({ ...filters, onlyNoReviewers: !filters.onlyNoReviewers })}
@@ -166,7 +166,7 @@ export function ListToolbar({
           </button>
           <button
             type="button"
-            className={`chip ${filters.onlyReady ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyReady ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyReady}
             title="Only your pull requests with nothing left to wait on"
             onClick={() => onFiltersChange({ ...filters, onlyReady: !filters.onlyReady })}
@@ -176,7 +176,7 @@ export function ListToolbar({
           </button>
           <button
             type="button"
-            className={`chip ${filters.onlyNew ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyNew ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyNew}
             title="Only your pull requests with new activity"
             onClick={() => onFiltersChange({ ...filters, onlyNew: !filters.onlyNew })}
@@ -185,7 +185,7 @@ export function ListToolbar({
           </button>
           <button
             type="button"
-            className={`chip ${filters.onlyFailing ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyFailing ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyFailing}
             onClick={() => onFiltersChange({ ...filters, onlyFailing: !filters.onlyFailing })}
           >
@@ -193,7 +193,7 @@ export function ListToolbar({
           </button>
           <button
             type="button"
-            className={`chip ${filters.onlyChanges ? "active" : ""}`}
+            className={`btn btn-xs ${filters.onlyChanges ? "btn-primary" : "btn-outline"}`}
             aria-pressed={filters.onlyChanges}
             onClick={() => onFiltersChange({ ...filters, onlyChanges: !filters.onlyChanges })}
           >
@@ -204,7 +204,7 @@ export function ListToolbar({
       {hasActiveFilters(filters) ? (
         <button
           type="button"
-          className="button tiny ghost"
+          className="btn btn-xs btn-ghost"
           aria-label="Clear filters"
           onClick={() => onFiltersChange(EMPTY_FILTERS)}
           data-testid="clear-filters"
