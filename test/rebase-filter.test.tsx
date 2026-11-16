@@ -10,6 +10,10 @@ import { makePr, makeSearchPayload } from "./fixtures";
  * BEHIND when the head branch is out of date with its base. It is not the same
  * as a merge conflict, and an old cached response with no verdict at all must
  * not be swept in.
+ *
+ * The verdict no longer travels in the list query — folding the computed field
+ * into "my pull requests" 502d it — so the list fixtures carry no verdict and
+ * the lean merge-status query supplies it, by node id.
  */
 
 const BEHIND = makePr({
@@ -17,7 +21,7 @@ const BEHIND = makePr({
   number: 90,
   title: "Branch is out of date",
   url: "https://github.com/jdoconnor/review-radar/pull/90",
-  mergeStateStatus: "BEHIND",
+  mergeStateStatus: undefined,
 });
 
 const CLEAN = makePr({
@@ -25,7 +29,7 @@ const CLEAN = makePr({
   number: 91,
   title: "Branch is up to date",
   url: "https://github.com/jdoconnor/review-radar/pull/91",
-  mergeStateStatus: "CLEAN",
+  mergeStateStatus: undefined,
 });
 
 const CONFLICTING = makePr({
@@ -34,7 +38,7 @@ const CONFLICTING = makePr({
   title: "Merge conflict, not a rebase",
   url: "https://github.com/jdoconnor/review-radar/pull/92",
   mergeable: "CONFLICTING",
-  mergeStateStatus: "DIRTY",
+  mergeStateStatus: undefined,
 });
 
 const LEGACY = makePr({
@@ -50,7 +54,7 @@ const REVIEW_BEHIND = makePr({
   number: 94,
   title: "Review request that needs a rebase",
   url: "https://github.com/jdoconnor/review-radar/pull/94",
-  mergeStateStatus: "BEHIND",
+  mergeStateStatus: undefined,
 });
 
 const REVIEW_CLEAN = makePr({
@@ -58,8 +62,19 @@ const REVIEW_CLEAN = makePr({
   number: 95,
   title: "Review request that is current",
   url: "https://github.com/jdoconnor/review-radar/pull/95",
-  mergeStateStatus: "CLEAN",
+  mergeStateStatus: undefined,
 });
+
+/** Verdicts the lean merge-status query returns, by node id. `mine-legacy`
+ * is deliberately absent: neither the list nor the lean query has a verdict
+ * for it, so it must never read as behind. */
+const LEAN_STATUSES: Record<string, string> = {
+  "mine-behind": "BEHIND",
+  "mine-clean": "CLEAN",
+  "mine-conflicting": "DIRTY",
+  "review-behind": "BEHIND",
+  "review-clean": "CLEAN",
+};
 
 const MINE_TITLES = [
   "Branch is out of date",
@@ -73,11 +88,27 @@ function visible(titles: string[]): string[] {
   return titles.filter((title) => screen.queryByText(title) !== null);
 }
 
-function stubFetch(): void {
+function stubFetch(leanStatus: "ok" | "fail" = "ok"): void {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as { variables?: { search?: string } };
+      const body = JSON.parse(String(init?.body)) as {
+        variables?: { search?: string; ids?: string[] };
+      };
+      if (Array.isArray(body.variables?.ids)) {
+        if (leanStatus === "fail") {
+          return new Response("Bad Gateway", { status: 502 });
+        }
+        const nodes = body.variables.ids
+          .filter((id) => id in LEAN_STATUSES)
+          .map((id) => ({ id, mergeStateStatus: LEAN_STATUSES[id] }));
+        return new Response(
+          JSON.stringify({
+            data: { nodes, rateLimit: makeSearchPayload([]).rateLimit },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
       const search = String(body.variables?.search ?? "");
       const nodes = search.includes("review-requested")
         ? [REVIEW_BEHIND, REVIEW_CLEAN]
@@ -110,6 +141,9 @@ describe("needs rebase filter", () => {
     await screen.findByTestId("review-queue");
     await user.click(screen.getByTestId("tab-mine"));
     await screen.findByText("Branch is out of date");
+    // The rebase pill proves the lean merge-status response has landed; the
+    // filter is meaningless until it has.
+    await screen.findByTestId("rebase-pill");
 
     expect(visible(MINE_TITLES)).toEqual(MINE_TITLES);
 
@@ -128,6 +162,7 @@ describe("needs rebase filter", () => {
     await screen.findByTestId("review-queue");
     await user.click(screen.getByTestId("tab-mine"));
     await screen.findByText("Branch is out of date");
+    await screen.findByTestId("rebase-pill");
 
     const behindRow = screen.getByText("Branch is out of date").closest('[data-testid="pr-row"]');
     const cleanRow = screen.getByText("Branch is up to date").closest('[data-testid="pr-row"]');
@@ -143,6 +178,7 @@ describe("needs rebase filter", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText("Review request that needs a rebase");
+    await screen.findByTestId("rebase-pill");
 
     expect(visible(REVIEW_TITLES)).toEqual(REVIEW_TITLES);
 
@@ -155,6 +191,7 @@ describe("needs rebase filter", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText("Review request that needs a rebase");
+    await screen.findByTestId("rebase-pill");
 
     await user.click(screen.getByTestId("filter-rebase"));
     await vi.waitFor(() => expect(window.location.hash).toContain("rebase"));
@@ -163,8 +200,29 @@ describe("needs rebase filter", () => {
     cleanup();
     render(<App />);
     await screen.findByTestId("review-queue");
+    await screen.findByTestId("rebase-pill");
 
     expect(await screen.findByTestId("filter-rebase")).toHaveAttribute("aria-pressed", "true");
     expect(visible(REVIEW_TITLES)).toEqual(["Review request that needs a rebase"]);
+  });
+
+  it("still renders the list when the lean merge-status query fails", async () => {
+    const user = userEvent.setup();
+    vi.unstubAllGlobals();
+    stubFetch("fail");
+    render(<App />);
+    await screen.findByTestId("review-queue");
+    await user.click(screen.getByTestId("tab-mine"));
+    await screen.findByText("Branch is out of date");
+
+    // The retry has settled by now, so the missing pill is the steady state,
+    // not a race with the fetch.
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+
+    expect(visible(MINE_TITLES)).toEqual(MINE_TITLES);
+    expect(screen.queryByTestId("rebase-pill")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("filter-rebase"));
+    expect(visible(MINE_TITLES)).toEqual([]);
   });
 });
