@@ -209,10 +209,50 @@ describe("fetchGraphQL error taxonomy", () => {
   });
 
   it("treats a 401 as an auth problem", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => response({ message: "Bad credentials" }, 401)));
+    const fetchMock = vi.fn(async () => response({ message: "Bad credentials" }, 401));
+    vi.stubGlobal("fetch", fetchMock);
 
     const error = await rejected(fetchGraphQL("token", "query", {}));
     expect(error.kind).toBe("auth");
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("retries once when a cross-origin response arrives without CORS headers", async () => {
+    // A bare GitHub edge 502 page has no Access-Control-Allow-Origin, so the
+    // browser rejects the fetch itself. The next attempt usually succeeds.
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("NetworkError when attempting to fetch resource."))
+      .mockResolvedValueOnce(response({ data: { search: { nodes: [] } } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchGraphQL<{ search: { nodes: unknown[] } }>("token", "query", {});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.data.search.nodes).toEqual([]);
+    expect(result.fromCache).toBe(false);
+  });
+
+  it("retries a gateway error, then reports it when it repeats", async () => {
+    const fetchMock = vi.fn(async () => response({ message: "Bad gateway" }, 502));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const error = await rejected(fetchGraphQL("token", "query", {}));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(error.kind).toBe("http");
+  });
+
+  it("stops retrying when the caller aborts", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn(async () => {
+      controller.abort();
+      throw new DOMException("Aborted", "AbortError");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchGraphQL("token", "query", {}, { signal: controller.signal }),
+    ).rejects.toBeInstanceOf(DOMException);
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it("refetches a cached warning written before the current warning version", async () => {
