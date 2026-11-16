@@ -41,6 +41,15 @@ export interface GraphQLPayload<T> {
 // next successful fetch replaces the stale warning text.
 const WARNING_VERSION = 2;
 
+// GitHub's edge occasionally answers a GraphQL request with a bare HTML
+// 502/503 page. Those pages carry no CORS header, so the browser hides them:
+// `fetch` rejects with an opaque TypeError that looks exactly like being
+// offline. One short retry turns that blip into a normal refresh; a real outage
+// still reaches the cache fallback, and the polling backoff handles the rest.
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 750;
+const TRANSIENT_STATUS = new Set([408, 500, 502, 503, 504]);
+
 export interface GraphQLResult<T> {
   data: T;
   rateLimit: RateLimit | null;
@@ -125,6 +134,26 @@ function rateLimitFromHeaders(headers: Headers): RateLimit | null {
     resetAt: Number.isFinite(resetSeconds) ? new Date(resetSeconds * 1000).toISOString() : "",
     cost: 1,
   };
+}
+
+/** Wait between retries, rejecting early when the caller aborts. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (!signal) return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 interface GraphQLErrorShape {
@@ -301,18 +330,27 @@ export async function fetchGraphQL<T>(
   };
   if (cached?.etag && !options.force && !warningOutdated) headers["If-None-Match"] = cached.etag;
 
-  let response: Response;
-  try {
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ query, variables }),
-      signal: options.signal,
-      credentials: "omit",
-      referrerPolicy: "no-referrer",
-    });
-  } catch (error) {
-    if (options.signal?.aborted) throw error;
+  let response: Response | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ query, variables }),
+        signal: options.signal,
+        credentials: "omit",
+        referrerPolicy: "no-referrer",
+      });
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      response = null;
+    }
+    const transient = !response || TRANSIENT_STATUS.has(response.status);
+    if (!transient || attempt === MAX_ATTEMPTS) break;
+    await sleep(RETRY_DELAY_MS * attempt, options.signal);
+  }
+
+  if (!response) {
     if (cached) {
       return {
         data: cached.value.data,
