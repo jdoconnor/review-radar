@@ -121,7 +121,11 @@ export interface PullRequestNode {
   deletions: number;
   changedFiles: number;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
-  /** GitHub's merge-state verdict; see `MergeStateStatus`. */
+  /**
+   * GitHub's merge-state verdict; see `MergeStateStatus`. Absent on list
+   * responses: the verdict is computed per pull request, so it is fetched by
+   * the lean merge-status query and overlaid afterwards.
+   */
   mergeStateStatus?: MergeStateStatus;
   reviewDecision: "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
   /** Branch the pull request would merge into. */
@@ -154,6 +158,18 @@ export type SearchNodes = Array<PullRequestNode | Record<string, never>>;
 export interface SearchPayload {
   search: { nodes: SearchNodes };
   viewer: { login: string };
+  rateLimit: RateLimit;
+}
+
+/** One pull request's merge-state verdict, as the lean merge-status query returns it. */
+export interface MergeStatusNode {
+  id: string;
+  mergeStateStatus?: MergeStateStatus | null;
+}
+
+/** The lean merge-status response: node ids in, verdicts out. */
+export interface MergeStatusPayload {
+  nodes: Array<MergeStatusNode | null>;
   rateLimit: RateLimit;
 }
 

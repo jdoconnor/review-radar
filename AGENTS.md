@@ -168,6 +168,11 @@ support 200% zoom and reflow, and honor reduced motion.
    temporary; the cache is the product.
 3. **One GraphQL request per view.** Fetch the search result plus nested review,
    comment and check data in a single query. Do not fan out per PR.
+   The one exception is `mergeStateStatus`: GitHub computes it per PR, and
+   folding it into the list queries pushed "my pull requests" past GitHub's
+   ~10s GraphQL timeout, which answers 502. It travels in the lean
+   `MERGE_STATUS_QUERY` (`nodes(ids:)`, batched at 50), which runs after a
+   list loads; a failed batch leaves the list untouched.
 4. **Derive, don't trust.** Approval counts, latest-review state, CI rollup and
    "new since last seen" are pure functions in `normalize.ts`, tested directly.
 5. **Poll politely.** Respect `document.hidden`, `rateLimit.remaining`, reset

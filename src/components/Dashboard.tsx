@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { useMergeStatuses } from "../hooks/useMergeStatuses";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
-import { myPullRequests, pullRequests, queryFor, variablesFor } from "../lib/queries";
+import { myPullRequests, pullRequests, queryFor, variablesFor, withMergeStatuses } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor, baselineFor, ensureBaseline } from "../lib/settings";
 import {
   countMergeReadiness,
@@ -212,10 +213,30 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const viewerLogin =
     reviewQuery.data?.viewer?.login ?? mineQuery.data?.viewer?.login ?? sessionViewer;
 
+  // Merge status is fetched separately from the list queries (see queries.ts):
+  // it runs once either list has loaded, for the pull requests on screen.
+  const mergeStatusIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (reviewQuery.data) {
+      for (const pr of pullRequests(reviewQuery.data)) ids.add(pr.id);
+    }
+    if (mineQuery.data) {
+      for (const pr of myPullRequests(mineQuery.data)) ids.add(pr.id);
+    }
+    return [...ids];
+  }, [reviewQuery.data, mineQuery.data]);
+
+  const mergeStatusesById = useMergeStatuses({
+    enabled: mergeStatusIds.length > 0,
+    token: settings.token,
+    ids: mergeStatusIds,
+    refreshSeconds: settings.refreshSeconds,
+  });
+
   const reviewItems = useMemo(() => {
     void seenVersion;
     if (!reviewQuery.data) return [];
-    const nodes = pullRequests(reviewQuery.data);
+    const nodes = withMergeStatuses(pullRequests(reviewQuery.data), mergeStatusesById);
     const parents = stackParents(nodes);
     return nodes.map((pr) =>
       toSummary(pr, {
@@ -225,12 +246,12 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
         stackedOn: parents.get(pullRequestKey(pr)) ?? null,
       }),
     );
-  }, [reviewQuery.data, seenVersion, viewerLogin]);
+  }, [reviewQuery.data, seenVersion, viewerLogin, mergeStatusesById]);
 
   const mineItems = useMemo(() => {
     void seenVersion;
     if (!mineQuery.data) return [];
-    const nodes = myPullRequests(mineQuery.data);
+    const nodes = withMergeStatuses(myPullRequests(mineQuery.data), mergeStatusesById);
     const parents = stackParents(nodes);
     // A pull request that has never been marked seen falls back to the first
     // time this browser started tracking activity. Without a fallback, a
@@ -246,7 +267,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
         stackedOn: parents.get(key) ?? null,
       });
     });
-  }, [mineQuery.data, seenVersion, viewerLogin]);
+  }, [mineQuery.data, seenVersion, viewerLogin, mergeStatusesById]);
 
   const mineReadyCount = useMemo(() => countMergeReadiness(mineItems).ready, [mineItems]);
 

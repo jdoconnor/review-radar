@@ -1,6 +1,21 @@
 import { cacheKey } from "./cache";
-import type { MySearchPayload, PullRequestNode, SearchPayload, ViewerPayload } from "./types";
+import type {
+  MergeStateStatus,
+  MergeStatusPayload,
+  MySearchPayload,
+  PullRequestNode,
+  SearchPayload,
+  ViewerPayload,
+} from "./types";
 
+/**
+ * The fields every list row needs. Deliberately no `mergeStateStatus`: GitHub
+ * computes that verdict per pull request, and folding it into these queries
+ * pushed "my pull requests" — two searches of 50, each already walking the
+ * head commit and its full check rollup — past GitHub's ~10s GraphQL timeout,
+ * which answers 502. The verdict travels in MERGE_STATUS_QUERY instead, after
+ * a list loads.
+ */
 const PR_FIELDS = `
   id
   number
@@ -13,7 +28,6 @@ const PR_FIELDS = `
   deletions
   changedFiles
   mergeable
-  mergeStateStatus
   reviewDecision
   baseRefName
   headRefName
@@ -129,6 +143,28 @@ export const VIEWER_QUERY = `
   }
 `;
 
+/** How many pull requests one merge-status request covers. */
+export const MERGE_STATUS_BATCH_SIZE = 50;
+
+/**
+ * Merge status, and nothing else. `nodes(ids:)` takes the global ids the list
+ * queries already returned, so this document never changes shape: only the
+ * variables do. Asked on its own, without the rollup, reviews, comments and
+ * stack selections, the computed verdict is cheap; folded into the list query
+ * it timed the request out.
+ */
+export const MERGE_STATUS_QUERY = `
+  query MergeStatus($ids: [ID!]!) {
+    nodes(ids: $ids) {
+      ... on PullRequest {
+        id
+        mergeStateStatus
+      }
+    }
+    ${RATE_LIMIT}
+  }
+`;
+
 export type SearchKind = "review" | "mine";
 
 export function searchText(kind: SearchKind): string {
@@ -184,6 +220,56 @@ export function myPullRequests(payload: MySearchPayload): PullRequestNode[] {
     merged.push(pr);
   }
   return merged;
+}
+
+/**
+ * Split node ids into merge-status batches, deduplicated in first-seen order.
+ * A batch is one `MERGE_STATUS_QUERY` request.
+ */
+export function mergeStatusBatches(ids: readonly string[]): string[][] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const id of ids) {
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    unique.push(id);
+  }
+  const batches: string[][] = [];
+  for (let start = 0; start < unique.length; start += MERGE_STATUS_BATCH_SIZE) {
+    batches.push(unique.slice(start, start + MERGE_STATUS_BATCH_SIZE));
+  }
+  return batches;
+}
+
+/** Node ids mapped to their merge-state verdicts. Null nodes and nodes GitHub
+ * answered without a verdict (not a pull request, or no verdict computed) are
+ * skipped, so the caller falls back to whatever the list response carried. */
+export function mergeStatuses(
+  payload: MergeStatusPayload | null | undefined,
+): Map<string, MergeStateStatus> {
+  const statuses = new Map<string, MergeStateStatus>();
+  for (const node of payload?.nodes ?? []) {
+    if (!node || typeof node.id !== "string") continue;
+    if (typeof node.mergeStateStatus !== "string") continue;
+    statuses.set(node.id, node.mergeStateStatus);
+  }
+  return statuses;
+}
+
+/**
+ * Overlay lean merge-status verdicts onto list nodes. A pull request the lean
+ * query has not answered keeps the verdict its list response carried (usually
+ * none), so a slow or failed lean fetch never blanks a row; a verdict the lean
+ * query did answer wins over a stale cached one.
+ */
+export function withMergeStatuses(
+  nodes: PullRequestNode[],
+  statuses: ReadonlyMap<string, MergeStateStatus>,
+): PullRequestNode[] {
+  return nodes.map((pr) => {
+    const status = statuses.get(pr.id);
+    return status === undefined ? pr : { ...pr, mergeStateStatus: status };
+  });
 }
 
 export function isViewerPayload(payload: unknown): payload is ViewerPayload {
