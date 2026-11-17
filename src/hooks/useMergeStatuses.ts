@@ -8,11 +8,14 @@ import {
 import type { MergeStateStatus, MergeStatusPayload } from "../lib/types";
 
 /**
- * At most three batches of 50: the review queue holds 50 pull requests and
- * "my pull requests" holds 100. A fixed number of hook slots keeps the hook
- * count stable while the id list changes size.
+ * At most six batches of 50: with lazy loading a view can hold more than the
+ * old 50/100 rows, and the merge-status ids come from every loaded page, so
+ * the ceiling has to grow with the pages. Six batches cover 300 pull requests
+ * (twelve pages of 25). A fixed number of hook slots keeps the hook count
+ * stable while the id list changes size; a pull request past the ceiling
+ * simply reads as not-behind, as before.
  */
-const MAX_BATCHES = 3;
+const MAX_BATCHES = 6;
 
 interface Options {
   enabled: boolean;
@@ -25,8 +28,8 @@ interface Options {
  * Merge-state verdicts for the pull requests a list already loaded.
  *
  * The list queries no longer ask for `mergeStateStatus` — GitHub computes it
- * per pull request, and folding it into the 2×50 "my pull requests" request
- * pushed that request past GitHub's ~10s GraphQL timeout (502). Each batch is
+ * per pull request, and folding it into the old 2×50 "my pull requests"
+ * request pushed that request past GitHub's ~10s GraphQL timeout (502). Each batch is
  * its own cached query through the same cache-first client as the lists, so it
  * gets the retry and the cache fallback for free.
  *
@@ -63,12 +66,36 @@ export function useMergeStatuses(options: Options): Map<string, MergeStateStatus
     refreshSeconds,
     active: enabled,
   });
+  const batch3 = useCachedQuery<MergeStatusPayload>({
+    enabled: enabled && batches.length > 3,
+    token,
+    query: MERGE_STATUS_QUERY,
+    variables: { ids: batches[3] ?? [] },
+    refreshSeconds,
+    active: enabled,
+  });
+  const batch4 = useCachedQuery<MergeStatusPayload>({
+    enabled: enabled && batches.length > 4,
+    token,
+    query: MERGE_STATUS_QUERY,
+    variables: { ids: batches[4] ?? [] },
+    refreshSeconds,
+    active: enabled,
+  });
+  const batch5 = useCachedQuery<MergeStatusPayload>({
+    enabled: enabled && batches.length > 5,
+    token,
+    query: MERGE_STATUS_QUERY,
+    variables: { ids: batches[5] ?? [] },
+    refreshSeconds,
+    active: enabled,
+  });
 
   return useMemo(() => {
     const merged = new Map<string, MergeStateStatus>();
-    for (const data of [batch0.data, batch1.data, batch2.data]) {
+    for (const data of [batch0.data, batch1.data, batch2.data, batch3.data, batch4.data, batch5.data]) {
       for (const [id, status] of mergeStatuses(data)) merged.set(id, status);
     }
     return merged;
-  }, [batch0.data, batch1.data, batch2.data]);
+  }, [batch0.data, batch1.data, batch2.data, batch3.data, batch4.data, batch5.data]);
 }

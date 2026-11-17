@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCachedQuery } from "../hooks/useCachedQuery";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { useMergeStatuses } from "../hooks/useMergeStatuses";
+import { usePaginatedList } from "../hooks/usePaginatedList";
 import { cacheStats, clearCache, pruneCacheIfDue, type CacheStats } from "../lib/cache";
-import { myPullRequests, pullRequests, queryFor, variablesFor, withMergeStatuses } from "../lib/queries";
+import { queryFor, variablesFor, withMergeStatuses } from "../lib/queries";
 import { markSeen, clearLastSeen, lastSeenFor, baselineFor, ensureBaseline } from "../lib/settings";
 import {
   countMergeReadiness,
@@ -213,18 +214,30 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
   const viewerLogin =
     reviewQuery.data?.viewer?.login ?? mineQuery.data?.viewer?.login ?? sessionViewer;
 
+  // Lazy pagination: the first page is the cache-first query above; "Load
+  // more" appends further pages of 25 without ever auto-fetching them, so
+  // the initial load stays small. A poll or manual refresh of the first page
+  // never wipes the loaded pages.
+  const reviewPages = usePaginatedList({
+    kind: "review",
+    token: settings.token,
+    firstPage: reviewQuery.data,
+  });
+  const minePages = usePaginatedList({
+    kind: "mine",
+    token: settings.token,
+    firstPage: mineQuery.data,
+  });
+
   // Merge status is fetched separately from the list queries (see queries.ts):
-  // it runs once either list has loaded, for the pull requests on screen.
+  // it runs once either list has loaded, for the pull requests on screen —
+  // including the ones a "Load more" brought in.
   const mergeStatusIds = useMemo(() => {
     const ids = new Set<string>();
-    if (reviewQuery.data) {
-      for (const pr of pullRequests(reviewQuery.data)) ids.add(pr.id);
-    }
-    if (mineQuery.data) {
-      for (const pr of myPullRequests(mineQuery.data)) ids.add(pr.id);
-    }
+    for (const pr of reviewPages.nodes) ids.add(pr.id);
+    for (const pr of minePages.nodes) ids.add(pr.id);
     return [...ids];
-  }, [reviewQuery.data, mineQuery.data]);
+  }, [reviewPages.nodes, minePages.nodes]);
 
   const mergeStatusesById = useMergeStatuses({
     enabled: mergeStatusIds.length > 0,
@@ -235,8 +248,7 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
 
   const reviewItems = useMemo(() => {
     void seenVersion;
-    if (!reviewQuery.data) return [];
-    const nodes = withMergeStatuses(pullRequests(reviewQuery.data), mergeStatusesById);
+    const nodes = withMergeStatuses(reviewPages.nodes, mergeStatusesById);
     const parents = stackParents(nodes);
     return nodes.map((pr) =>
       toSummary(pr, {
@@ -246,12 +258,11 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
         stackedOn: parents.get(pullRequestKey(pr)) ?? null,
       }),
     );
-  }, [reviewQuery.data, seenVersion, viewerLogin, mergeStatusesById]);
+  }, [reviewPages.nodes, seenVersion, viewerLogin, mergeStatusesById]);
 
   const mineItems = useMemo(() => {
     void seenVersion;
-    if (!mineQuery.data) return [];
-    const nodes = withMergeStatuses(myPullRequests(mineQuery.data), mergeStatusesById);
+    const nodes = withMergeStatuses(minePages.nodes, mergeStatusesById);
     const parents = stackParents(nodes);
     // A pull request that has never been marked seen falls back to the first
     // time this browser started tracking activity. Without a fallback, a
@@ -372,6 +383,10 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       stale={reviewQuery.stale}
       fromCache={reviewQuery.fromCache}
       lastUpdated={reviewQuery.lastUpdated}
+      hasMore={reviewPages.hasMore}
+      loadingMore={reviewPages.loadingMore}
+      loadMoreError={reviewPages.loadMoreError}
+      onLoadMore={reviewPages.loadMore}
       onActivate={() => setTab("review")}
       onMarkSeen={onMarkSeen}
       onRefresh={refreshActive}
@@ -394,6 +409,10 @@ export function Dashboard({ settings, onChange, theme, onToggleTheme, onSignOut 
       stale={mineQuery.stale}
       fromCache={mineQuery.fromCache}
       lastUpdated={mineQuery.lastUpdated}
+      hasMore={minePages.hasMore}
+      loadingMore={minePages.loadingMore}
+      loadMoreError={minePages.loadMoreError}
+      onLoadMore={minePages.loadMore}
       onActivate={() => setTab("mine")}
       onMarkSeen={onMarkSeen}
       onRefresh={refreshActive}
