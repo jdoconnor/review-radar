@@ -622,6 +622,17 @@
     color: var(--muted);
   }
 
+  .load-more {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .load-more-button {
+    align-self: stretch;
+  }
+
   .keyboard-hint {
     margin: 0.25rem 0.125rem 0;
     color: var(--faint);

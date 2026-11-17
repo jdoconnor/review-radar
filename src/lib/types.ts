@@ -5,6 +5,12 @@ export interface RateLimit {
   cost: number;
 }
 
+/** Cursor pagination state for one search connection. */
+export interface PageInfo {
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+
 export type CheckState = "success" | "failure" | "pending" | "neutral" | "unknown";
 
 export interface CheckSummary {
@@ -156,7 +162,7 @@ export interface PullRequestNode {
 export type SearchNodes = Array<PullRequestNode | Record<string, never>>;
 
 export interface SearchPayload {
-  search: { nodes: SearchNodes };
+  search: { nodes: SearchNodes; pageInfo?: PageInfo };
   viewer: { login: string };
   rateLimit: RateLimit;
 }
@@ -179,9 +185,9 @@ export interface MergeStatusPayload {
  * connection, kept so an older cached response still reads.
  */
 export interface MySearchPayload {
-  search?: { nodes: SearchNodes };
-  authored?: { nodes: SearchNodes };
-  assigned?: { nodes: SearchNodes };
+  search?: { nodes: SearchNodes; pageInfo?: PageInfo };
+  authored?: { nodes: SearchNodes; pageInfo?: PageInfo };
+  assigned?: { nodes: SearchNodes; pageInfo?: PageInfo };
   viewer?: { login: string };
   rateLimit: RateLimit;
 }

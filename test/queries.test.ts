@@ -3,14 +3,23 @@ import {
   MERGE_STATUS_BATCH_SIZE,
   MERGE_STATUS_QUERY,
   MY_PRS_QUERY,
+  PAGE_SIZE,
   REVIEW_QUEUE_QUERY,
+  cacheKeyFor,
+  mergeNodePages,
   mergeStatusBatches,
   mergeStatuses,
+  myHasMorePages,
+  myPageInfo,
   myPullRequests,
+  nextMyCursors,
+  nextReviewCursors,
+  reviewHasMorePages,
+  reviewPageInfo,
   variablesFor,
   withMergeStatuses,
 } from "../src/lib/queries";
-import type { MergeStatusPayload, MySearchPayload } from "../src/lib/types";
+import type { MergeStatusPayload, MySearchPayload, SearchPayload } from "../src/lib/types";
 import { makePr, makeSearchPayload } from "./fixtures";
 
 const RATE_LIMIT = makeSearchPayload([]).rateLimit;
@@ -27,6 +36,104 @@ describe("my pull requests search", () => {
     const variables = variablesFor("mine");
     expect(String(variables.search)).not.toContain(" OR ");
     expect(String(variables.assigned)).not.toContain(" OR ");
+  });
+});
+
+describe("list pagination", () => {
+  it("fetches 25 pull requests per page with cursor pagination", () => {
+    expect(PAGE_SIZE).toBe(25);
+    for (const query of [REVIEW_QUEUE_QUERY, MY_PRS_QUERY]) {
+      expect(query).toContain("first: 25");
+      expect(query).toContain("pageInfo { hasNextPage endCursor }");
+    }
+    expect(REVIEW_QUEUE_QUERY).toContain("$after: String");
+    expect(MY_PRS_QUERY).toContain("$afterAuthored: String");
+    expect(MY_PRS_QUERY).toContain("$afterAssigned: String");
+  });
+
+  it("passes no cursor for the first page and the cursors after that", () => {
+    expect(variablesFor("review")).toEqual({
+      search: expect.stringContaining("review-requested"),
+      after: null,
+    });
+    expect(variablesFor("review", { after: "cursor-1" }).after).toBe("cursor-1");
+    expect(variablesFor("mine", { after: "a-1", afterAssigned: "b-1" })).toEqual({
+      search: expect.stringContaining("author:@me"),
+      assigned: expect.stringContaining("assignee:@me"),
+      afterAuthored: "a-1",
+      afterAssigned: "b-1",
+    });
+  });
+
+  it("keys the cache per page, so pages do not overwrite each other", () => {
+    expect(cacheKeyFor("review")).not.toBe(cacheKeyFor("review", { after: "cursor-1" }));
+    expect(cacheKeyFor("review", { after: "cursor-1" })).toBe(
+      cacheKeyFor("review", { after: "cursor-1" }),
+    );
+  });
+
+  it("reads pageInfo and reports whether another page exists", () => {
+    const withMore: SearchPayload = {
+      ...makeSearchPayload([makePr({ id: "PR_1" })]),
+      search: {
+        nodes: [makePr({ id: "PR_1" })],
+        pageInfo: { hasNextPage: true, endCursor: "cursor-1" },
+      },
+    };
+    expect(reviewPageInfo(withMore)).toEqual({ hasNextPage: true, endCursor: "cursor-1" });
+    expect(reviewHasMorePages(withMore)).toBe(true);
+    expect(nextReviewCursors(withMore)).toEqual({ after: "cursor-1" });
+
+    const lastPage: SearchPayload = {
+      ...withMore,
+      search: { nodes: [], pageInfo: { hasNextPage: false, endCursor: "cursor-2" } },
+    };
+    expect(reviewHasMorePages(lastPage)).toBe(false);
+
+    // A legacy cached response without pageInfo reads as a single page.
+    expect(reviewPageInfo(makeSearchPayload([]))).toBeNull();
+    expect(reviewHasMorePages(makeSearchPayload([]))).toBe(false);
+    expect(nextReviewCursors(makeSearchPayload([]))).toEqual({ after: null });
+  });
+
+  it("reads both halves of my pull requests and their cursors", () => {
+    const payload: MySearchPayload = {
+      authored: {
+        nodes: [makePr({ id: "PR_a" })],
+        pageInfo: { hasNextPage: true, endCursor: "a-1" },
+      },
+      assigned: {
+        nodes: [makePr({ id: "PR_b" })],
+        pageInfo: { hasNextPage: false, endCursor: "b-1" },
+      },
+      rateLimit: RATE_LIMIT,
+    };
+    expect(myPageInfo(payload)).toEqual({
+      authored: { hasNextPage: true, endCursor: "a-1" },
+      assigned: { hasNextPage: false, endCursor: "b-1" },
+    });
+    expect(myHasMorePages(payload)).toBe(true);
+    expect(nextMyCursors(payload)).toEqual({ after: "a-1", afterAssigned: "b-1" });
+
+    const done: MySearchPayload = {
+      ...payload,
+      authored: { nodes: [], pageInfo: { hasNextPage: false, endCursor: "a-2" } },
+    };
+    expect(myHasMorePages(done)).toBe(false);
+    // The exhausted half re-sends its last cursor, which answers an empty page.
+    expect(nextMyCursors(done)).toEqual({ after: "a-2", afterAssigned: "b-1" });
+  });
+
+  it("merges pages in order, keeping a pull request that moved once", () => {
+    const first = makePr({ id: "PR_1", number: 1 });
+    const second = makePr({ id: "PR_2", number: 2 });
+    const third = makePr({ id: "PR_3", number: 3 });
+    expect(
+      mergeNodePages([
+        [first, second],
+        [second, third],
+      ]).map((pr) => pr.id),
+    ).toEqual(["PR_1", "PR_2", "PR_3"]);
   });
 });
 

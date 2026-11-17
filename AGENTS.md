@@ -166,9 +166,12 @@ support 200% zoom and reflow, and honor reduced motion.
    place, with a stale banner, not an empty page.
 2. **Never destroy the cache on an auth or rate-limit error.** Those are
    temporary; the cache is the product.
-3. **One GraphQL request per view.** Fetch the search result plus nested review,
-   comment and check data in a single query. Do not fan out per PR.
-   The one exception is `mergeStateStatus`: GitHub computes it per PR, and
+3. **One GraphQL request per view — plus one per Load more.** Fetch the search
+   result plus nested review, comment and check data in a single query. Do not
+   fan out per PR. The first page is one request (25 pull requests); each Load
+   more is one additional request for the next page of that view, and Load more
+   never fires on its own — the initial load stays one page.
+   The other exception is `mergeStateStatus`: GitHub computes it per PR, and
    folding it into the list queries pushed "my pull requests" past GitHub's
    ~10s GraphQL timeout, which answers 502. It travels in the lean
    `MERGE_STATUS_QUERY` (`nodes(ids:)`, batched at 50), which runs after a

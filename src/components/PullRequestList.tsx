@@ -29,6 +29,13 @@ interface Props {
   stale: boolean;
   fromCache: boolean;
   lastUpdated: number | null;
+  /** Another page exists after the rows on screen. */
+  hasMore: boolean;
+  /** A "Load more" fetch is in flight. */
+  loadingMore: boolean;
+  /** The last "Load more" failed; the button stays so the reader can retry. */
+  loadMoreError: GithubError | null;
+  onLoadMore: () => void;
   onActivate: () => void;
   onMarkSeen: (key: string) => void;
   onRefresh: () => void;
@@ -48,6 +55,10 @@ export function PullRequestList({
   warning,
   stale,
   lastUpdated,
+  hasMore,
+  loadingMore,
+  loadMoreError,
+  onLoadMore,
   onActivate,
   onMarkSeen,
   onRefresh,
@@ -328,6 +339,37 @@ export function PullRequestList({
           ))}
         </div>
       )}
+
+      {hasMore ? (
+        <div className="load-more">
+          {loadMoreError ? (
+            <div
+              className="alert alert-warning"
+              role="status"
+              data-testid={kind === "review" ? "load-more-review-error" : "load-more-mine-error"}
+            >
+              <strong>Couldn&apos;t load more.</strong> {loadMoreError.message} Try again.
+            </div>
+          ) : null}
+          <button
+            type="button"
+            className="btn btn-outline load-more-button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            aria-busy={loadingMore || undefined}
+            data-testid={kind === "review" ? "load-more-review" : "load-more-mine"}
+          >
+            {loadingMore ? (
+              <>
+                <span className="loading loading-spinner loading-xs" aria-hidden="true" />
+                Loading more…
+              </>
+            ) : (
+              "Load more"
+            )}
+          </button>
+        </div>
+      ) : null}
 
       <p className="keyboard-hint">
         <kbd>j</kbd>/<kbd>k</kbd> move · <kbd>o</kbd> open · <kbd>m</kbd> mark seen · <kbd>r</kbd> refresh ·{" "}
