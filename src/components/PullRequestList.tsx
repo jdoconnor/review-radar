@@ -9,10 +9,14 @@ import {
   sortForAttention,
 } from "../lib/normalize";
 import type { PullRequestSummary } from "../lib/types";
+import { useAnimatedList, useFlipAnimation } from "../hooks/useAnimatedList";
 import { EmptyState, Spinner } from "./Bits";
 import { hasActiveFilters } from "./ListToolbar";
 import type { Filters, SortOrder } from "./ListToolbar";
 import { PullRequestRow } from "./PullRequestRow";
+
+type VisibleRow = ReturnType<typeof expandStackRows>[number];
+const visibleRowKey = (row: VisibleRow): string => row.pr.key;
 
 interface Props {
   kind: "review" | "mine";
@@ -132,6 +136,15 @@ export function PullRequestList({
   );
   const ordered = useMemo(() => visibleRows.map((row) => row.pr), [visibleRows]);
 
+  // Animation layer: new rows pop in staggered, departed rows leave a brief
+  // decorative poof where they were, and surviving rows glide (FLIP) to
+  // close the gap. Nothing functional waits on an animation — keyboard
+  // order, selection and counts all keep reading `visibleRows`/`ordered`,
+  // and a departed row leaves the DOM in the same commit as the data.
+  const { entries: animatedRows, poofs } = useAnimatedList(visibleRows, visibleRowKey);
+  const rowsRef = useRef<HTMLDivElement | null>(null);
+  useFlipAnimation(rowsRef);
+
   const toggleStack = (key: string): void => {
     const next = new Set(expandedKeys);
     if (next.has(key)) next.delete(key);
@@ -231,7 +244,9 @@ export function PullRequestList({
       {heading ? (
         <div className="list-head">
           <h2>{heading}</h2>
-          <span className="badge badge-sm badge-ghost">{items.length}</span>
+          <span key={items.length} className="badge badge-sm badge-ghost count-pop">
+            {items.length}
+          </span>
         </div>
       ) : null}
       {kind === "mine" && visible.length > 0 ? (
@@ -306,7 +321,7 @@ export function PullRequestList({
             body="Nothing you opened or were assigned to is open right now."
           />
         )
-      ) : shown.length === 0 ? (
+      ) : animatedRows.length === 0 ? (
         <EmptyState
           title="Nothing matches those filters"
           body="Clear the search or loosen the quick filters to see the rest."
@@ -314,6 +329,7 @@ export function PullRequestList({
         />
       ) : (
         <div
+          ref={rowsRef}
           className="rows"
           role="list"
           aria-label={kind === "review" ? "Review requests" : "My pull requests"}
@@ -322,21 +338,44 @@ export function PullRequestList({
           onPointerEnter={() => setHeldKeys((current) => current ?? visible.map((pr) => pr.key))}
           onPointerLeave={() => setHeldKeys(null)}
         >
-          {visibleRows.map(({ pr, depth, childKeys, descendants }) => (
-            <PullRequestRow
-              key={pr.key}
-              pr={pr}
-              kind={kind}
-              viewerLogin={viewerLogin}
-              stackDepth={depth}
-              stackChildren={childKeys.length > 0 ? descendants : 0}
-              stackExpanded={expandedKeys.has(pr.key)}
-              onToggleStack={() => toggleStack(pr.key)}
-              selected={selectedKey === pr.key}
-              onSelect={() => setSelectedKey(pr.key)}
-              onMarkSeen={onMarkSeen}
-            />
-          ))}
+          {animatedRows.flatMap(({ item: { pr, depth, childKeys, descendants }, phase, enterIndex }, index) => {
+            const nodes = poofs
+              .filter((poof) => Math.min(poof.index, animatedRows.length) === index)
+              .map((poof) => (
+                <div key={`poof-${poof.id}`} className="row-poof" data-testid="row-poof" aria-hidden="true">
+                  <span>✦</span>
+                  <span>✦</span>
+                  <span>✦</span>
+                </div>
+              ));
+            nodes.push(
+              <PullRequestRow
+                key={pr.key}
+                pr={pr}
+                kind={kind}
+                viewerLogin={viewerLogin}
+                stackDepth={depth}
+                stackChildren={childKeys.length > 0 ? descendants : 0}
+                stackExpanded={expandedKeys.has(pr.key)}
+                onToggleStack={() => toggleStack(pr.key)}
+                selected={selectedKey === pr.key}
+                onSelect={() => setSelectedKey(pr.key)}
+                onMarkSeen={onMarkSeen}
+                phase={phase}
+                enterIndex={enterIndex}
+              />,
+            );
+            return nodes;
+          })}
+          {poofs
+            .filter((poof) => poof.index >= animatedRows.length)
+            .map((poof) => (
+              <div key={`poof-${poof.id}`} className="row-poof" data-testid="row-poof" aria-hidden="true">
+                <span>✦</span>
+                <span>✦</span>
+                <span>✦</span>
+              </div>
+            ))}
         </div>
       )}
 

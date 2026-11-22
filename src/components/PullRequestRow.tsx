@@ -37,6 +37,12 @@ interface Props {
   selected: boolean;
   onSelect: () => void;
   onMarkSeen: (key: string) => void;
+  /**
+   * List-animation phase. "enter" rows pop in, staggered by `enterIndex`.
+   * Departures never keep a row in the DOM — see useAnimatedList.
+   */
+  phase?: "enter" | "stay";
+  enterIndex?: number;
 }
 
 export function PullRequestRow({
@@ -50,6 +56,8 @@ export function PullRequestRow({
   selected,
   onSelect,
   onMarkSeen,
+  phase = "stay",
+  enterIndex = 0,
 }: Props) {
   const stacked = stackDepth > 0;
   const hasStack = stackChildren > 0;
@@ -65,12 +73,23 @@ export function PullRequestRow({
     if (pr.newActivity > 0) onMarkSeen(pr.key);
   };
 
+  const rowStyle = {
+    ...(stacked ? ({ "--stack-depth": stackDepth } as CSSProperties) : {}),
+    ...(phase === "enter"
+      ? ({ "--enter-delay": `${Math.min(enterIndex, 8) * 45}ms` } as CSSProperties)
+      : {}),
+  };
+
   return (
     <article
       className={`card card-border pr-row ${stacked ? "stacked-row" : ""} ${
         selected ? "selected" : ""
-      } ${kind === "review" ? "needs-review" : `readiness-${pr.readiness.state}`}`}
+      } ${kind === "review" ? "needs-review" : `readiness-${pr.readiness.state}`} ${
+        phase === "enter" ? "pr-row--entering" : ""
+      }`}
       data-testid="pr-row"
+      data-phase={phase}
+      data-flip-key={pr.key}
       data-pr-key={pr.key}
       data-readiness={kind === "mine" ? pr.readiness.state : undefined}
       data-in-stack={pr.stack || hasStack ? "true" : "false"}
@@ -81,7 +100,7 @@ export function PullRequestRow({
       data-selected={selected ? "true" : "false"}
       aria-selected={selected}
       tabIndex={0}
-      style={stacked ? ({ "--stack-depth": stackDepth } as CSSProperties) : undefined}
+      style={Object.keys(rowStyle).length > 0 ? rowStyle : undefined}
       onClick={() => {
         onSelect();
         markRead();
